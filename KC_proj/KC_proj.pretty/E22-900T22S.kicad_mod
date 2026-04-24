@@ -1,0 +1,273 @@
+(footprint "E22-900T22S"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -17.5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "4aff53d2-c064-4c56-baf3-76e1225220f0")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "E22-900T22S"
+		(at 0 -16 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "b273901c-82a1-4305-8ccc-a45183e0e03c")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "2e11b8cb-fe6f-4094-bd9e-07405260f8fe")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ce3164c4-91ec-4f1c-83e6-929ab69cdc4a")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_rect
+		(start -8 -13)
+		(end 8 13)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "e1277ae9-d667-47c8-b3a9-ec5c9f7ef41b")
+	)
+	(fp_rect
+		(start -6.5 9.25)
+		(end -3.5 12.25)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "97c26233-ecf1-4a65-8e82-675ebdd309a8")
+	)
+	(fp_poly
+		(pts
+			(xy -6.5 -12.25) (xy -6.5 8.25) (xy -2.5 8.25) (xy -2.5 12.25) (xy 6.5 12.25) (xy 6.5 -12.25)
+		)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "a352aa38-7ac9-4e63-8809-0e913ac8e49d")
+	)
+	(fp_rect
+		(start -9.45 -13.45)
+		(end 9.45 13.45)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "de85d82f-ba74-45b1-8dd4-96124c2e2768")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 -14.5 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "00cb89a3-1b0f-4dc5-87fc-0623fb640911")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" smd rect
+		(at -8 -11)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "B.Adhes" "F.Paste")
+		(uuid "2449ece4-05bf-4491-bc10-f984e9e612c3")
+	)
+	(pad "2" smd rect
+		(at -8 -9.73)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "b127e332-60dc-4797-b7ce-a3de891666a4")
+	)
+	(pad "3" smd rect
+		(at -8 -8.46)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "514c24b4-4e21-40ec-bf0a-e96692a790c3")
+	)
+	(pad "4" smd rect
+		(at -8 -7.19)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "451a7b27-c5b6-4c42-9cfc-4413b5a4ecde")
+	)
+	(pad "5" smd rect
+		(at -8 -5.92)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "32fa7a1c-cbdd-4229-84de-de8df60ea052")
+	)
+	(pad "6" smd rect
+		(at -8 -4.65)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "f011309e-898e-415d-819c-fc3c432fd145")
+	)
+	(pad "7" smd rect
+		(at -8 -3.38)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "9f2a74a3-add3-45fa-84c5-cca6f3d26886")
+	)
+	(pad "8" smd rect
+		(at -8 -2.11)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "8dfb702f-7bf1-4400-a11e-672191fb5d57")
+	)
+	(pad "11" smd rect
+		(at -7.95 9.09)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "d054a44d-b57b-4ad8-997d-7ddd24a0eb49")
+	)
+	(pad "12" smd rect
+		(at -7.95 10.36)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "6c5e9343-9fec-48ad-bf6b-b2f9bac097d6")
+	)
+	(pad "13" smd rect
+		(at -7.95 11.63)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "79beebe3-677a-43e8-b5e5-8bd10e8e29d4")
+	)
+	(pad "14" smd rect
+		(at 8.05 11.63)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "389bab7c-79d0-4907-b628-ab2d4428caf2")
+	)
+	(pad "15" smd rect
+		(at 8.05 10.36)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "af3ef2ed-73ab-4d75-a2ba-97e206ae646a")
+	)
+	(pad "16" smd rect
+		(at 8.05 9.09)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "5925bc42-e15b-49f0-9c0d-8f7ea7c7b5a2")
+	)
+	(pad "19" smd rect
+		(at 8 -2.11)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "a0be42d8-5c6a-423f-b0a7-56a3f1fd2996")
+	)
+	(pad "20" smd rect
+		(at 8 -3.38)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "066a23ff-e185-45a1-84a1-46ad525d91e1")
+	)
+	(pad "21" smd rect
+		(at 8 -4.65)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "82d69f51-4775-419b-b690-9340c0c01210")
+	)
+	(pad "22" smd rect
+		(at 8 -5.92)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "20dc9189-3128-4baf-a1da-f41b4fd43b9a")
+	)
+	(pad "23" smd rect
+		(at 8 -7.19)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "4e131138-8bfc-4ac7-9d6d-578d7a14140c")
+	)
+	(pad "24" smd rect
+		(at 8 -8.46)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "a519a6c0-96da-4526-a892-99cb94f9e8af")
+	)
+	(pad "25" smd rect
+		(at 8 -9.73)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "4ec85603-f647-44d0-b050-6975c6368f65")
+	)
+	(pad "26" smd rect
+		(at 8 -11)
+		(size 1.8 0.9)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "52ecc6d5-caa2-4654-bd79-4c78d843e3b1")
+	)
+	(group ""
+		(uuid "35a3b213-2c5c-4bd9-b930-61a7f42be1a4")
+		(members "066a23ff-e185-45a1-84a1-46ad525d91e1" "20dc9189-3128-4baf-a1da-f41b4fd43b9a"
+			"2449ece4-05bf-4491-bc10-f984e9e612c3" "32fa7a1c-cbdd-4229-84de-de8df60ea052"
+			"389bab7c-79d0-4907-b628-ab2d4428caf2" "451a7b27-c5b6-4c42-9cfc-4413b5a4ecde"
+			"4e131138-8bfc-4ac7-9d6d-578d7a14140c" "4ec85603-f647-44d0-b050-6975c6368f65"
+			"514c24b4-4e21-40ec-bf0a-e96692a790c3" "52ecc6d5-caa2-4654-bd79-4c78d843e3b1"
+			"5925bc42-e15b-49f0-9c0d-8f7ea7c7b5a2" "6c5e9343-9fec-48ad-bf6b-b2f9bac097d6"
+			"79beebe3-677a-43e8-b5e5-8bd10e8e29d4" "82d69f51-4775-419b-b690-9340c0c01210"
+			"8dfb702f-7bf1-4400-a11e-672191fb5d57" "9f2a74a3-add3-45fa-84c5-cca6f3d26886"
+			"a0be42d8-5c6a-423f-b0a7-56a3f1fd2996" "a519a6c0-96da-4526-a892-99cb94f9e8af"
+			"af3ef2ed-73ab-4d75-a2ba-97e206ae646a" "b127e332-60dc-4797-b7ce-a3de891666a4"
+			"d054a44d-b57b-4ad8-997d-7ddd24a0eb49" "f011309e-898e-415d-819c-fc3c432fd145"
+		)
+	)
+	(embedded_fonts no)
+	(model "C:/Users/admin/OneDrive/Desktop/LRI/HAL-1-HW/KiCAD/Added_Footprints/E22-900T22S/E22-xxxT22S(3D).step"
+		(offset
+			(xyz -8 13 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz -0 -0 90)
+		)
+	)
+)

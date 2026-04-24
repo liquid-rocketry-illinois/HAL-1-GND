@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "E22-900T22S") (type "KiCad") (uri "${KIPRJMOD}/KC_proj.pretty/E22-900T22S.kicad_sym") (options "") (descr ""))
+)
