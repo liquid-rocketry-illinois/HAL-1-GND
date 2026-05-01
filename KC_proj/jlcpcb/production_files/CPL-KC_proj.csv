@@ -9,9 +9,6 @@ C5,4.7u,C_0603_1608Metric,136.45,-93.6,0.0,top
 C6,22u,C_0603_1608Metric,158.9,-91.1,180.0,top
 C7,0.1u,C_0603_1608Metric,150.1,-87.55,180.0,top
 D1,LED,LED_1206_3216Metric,131.6,-100.15,0.0,top
-H1,MountingHole,MountingHole_2.2mm_M2,124.15,-63.0,0.0,top
-H2,MountingHole,MountingHole_2.2mm_M2,157.2,-73.4,0.0,top
-H3,MountingHole,MountingHole_2.2mm_M2,126.5,-101.4,0.0,top
 J3,USB_C_Receptacle_USB2.0_14P,USB_C_Receptacle_HRO_TYPE-C-31-M-12,153.245,-100.785,180.0,top
 R1,47,R_0603_1608Metric,131.7,-98.19,0.0,top
 R2,4.7k,R_0603_1608Metric,128.7,-98.2,0.0,top

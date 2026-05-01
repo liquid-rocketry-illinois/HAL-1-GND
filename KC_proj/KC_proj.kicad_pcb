@@ -212,6 +212,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -566,6 +567,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -737,7 +739,7 @@
 				(pins)
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_bom dnp)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
 			(center 0 0)
@@ -843,6 +845,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -1126,6 +1129,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -1315,6 +1319,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -1568,6 +1573,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -2019,6 +2025,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -2339,6 +2346,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -2510,7 +2518,7 @@
 				(pins)
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_bom dnp)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
 			(center 0 0)
@@ -2624,6 +2632,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -2793,6 +2802,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -2962,6 +2972,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -3123,6 +3134,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -3575,6 +3587,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -3744,6 +3757,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -3926,6 +3940,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -4146,6 +4161,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -4315,6 +4331,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -4484,6 +4501,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -4927,6 +4945,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -5088,6 +5107,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -5349,6 +5369,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -5518,6 +5539,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -6254,6 +6276,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -6425,7 +6448,7 @@
 				(pins)
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_bom dnp)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
 			(center 0 0)
@@ -6539,6 +6562,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -6708,6 +6732,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -6877,6 +6902,7 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.15)
 				)
 			)
 		)
@@ -7458,6 +7484,54 @@
 		(layer "F.Cu")
 		(net "/M1")
 		(uuid "f51ad9c7-3c30-4b3f-8fc7-8ec8d3565043")
+	)
+	(segment
+		(start 141.95 88.1)
+		(end 141.95 86.55)
+		(width 0.5)
+		(layer "F.Cu")
+		(net "/MCU_TX")
+		(uuid "0afa5e48-96c9-41d4-a2c8-722cf0e44803")
+	)
+	(segment
+		(start 141.95 86.55)
+		(end 134.51 79.11)
+		(width 0.5)
+		(layer "F.Cu")
+		(net "/MCU_TX")
+		(uuid "41884d1e-3244-4327-8345-8af6df5dc1ac")
+	)
+	(segment
+		(start 134.51 79.11)
+		(end 133.5 79.11)
+		(width 0.5)
+		(layer "F.Cu")
+		(net "/MCU_TX")
+		(uuid "9a6afa8f-6508-4b8c-947d-c9ff3ca67296")
+	)
+	(segment
+		(start 134.484506 80.38)
+		(end 141.15 87.045494)
+		(width 0.5)
+		(layer "F.Cu")
+		(net "/MCU_RX")
+		(uuid "75bcb03a-b245-4258-9975-f4b638cb4397")
+	)
+	(segment
+		(start 133.5 80.38)
+		(end 134.484506 80.38)
+		(width 0.5)
+		(layer "F.Cu")
+		(net "/MCU_RX")
+		(uuid "929ca6bd-488e-494d-8419-0533cb7a7add")
+	)
+	(segment
+		(start 141.15 87.045494)
+		(end 141.15 88.1)
+		(width 0.5)
+		(layer "F.Cu")
+		(net "/MCU_RX")
+		(uuid "cb9735f3-6e07-43db-a3b3-83386735f8fa")
 	)
 	(segment
 		(start 134.649999 81.65)
@@ -8148,6 +8222,150 @@
 		(uuid "f80de896-d963-491d-9ee0-9a44235a18e0")
 	)
 	(segment
+		(start 153.26259 97.175)
+		(end 153.72741 97.175)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "0e58a39b-d3fe-4c2f-a318-26281d568523")
+	)
+	(segment
+		(start 153.995 97.44259)
+		(end 153.995 98.2)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "1654bbbc-f53c-4faa-8164-4517d1d8b66b")
+	)
+	(segment
+		(start 147.325 90.275)
+		(end 148.525 90.275)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "56039a79-0cd4-41b6-a76f-1d4a9a5f3f2d")
+	)
+	(segment
+		(start 152.995 97.3)
+		(end 152.995 98.2)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "5df2ca15-44e7-4430-8406-71d52e0d3e72")
+	)
+	(segment
+		(start 152.995 98.2)
+		(end 152.995 97.44259)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "6e1ff9d7-14c7-448b-b409-a1c428cd37a1")
+	)
+	(segment
+		(start 153.72741 97.175)
+		(end 153.995 97.44259)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "9092951b-78d1-4800-bc34-0f10baf2df42")
+	)
+	(segment
+		(start 152.995 97.44259)
+		(end 153.26259 97.175)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "958f8f03-e178-456b-a419-f0fd51ac4318")
+	)
+	(segment
+		(start 148.525 90.275)
+		(end 152.995 94.745)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "e023fff0-50b0-41d0-9153-7eff24cdcb8b")
+	)
+	(segment
+		(start 152.995 94.745)
+		(end 152.995 98.2)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/USB_D+")
+		(uuid "e389f646-cad9-46e5-b703-73d6f88cc696")
+	)
+	(segment
+		(start 152.76259 99.225)
+		(end 152.495 98.95741)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "3c0f5e3a-dba4-47f9-b6d0-e3803cad9d4f")
+	)
+	(segment
+		(start 152.495 95.102106)
+		(end 152.495 98.2)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "42f68817-305b-416d-bc46-2ae7256f836c")
+	)
+	(segment
+		(start 148.467894 91.075)
+		(end 152.495 95.102106)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "4da7fb96-7c70-4d2c-b53b-534c8d8bad0f")
+	)
+	(segment
+		(start 153.495 98.2)
+		(end 153.495 98.95741)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "595cf22c-dfa0-48e5-9253-242929af7784")
+	)
+	(segment
+		(start 153.55 98.7)
+		(end 153.55 97.9)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "676aa12b-8a00-4e85-9198-e822ba530b6a")
+	)
+	(segment
+		(start 153.22741 99.225)
+		(end 152.76259 99.225)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "9aca525e-ee7e-48a3-aad8-23b4bfb782b2")
+	)
+	(segment
+		(start 153.495 98.95741)
+		(end 153.22741 99.225)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "abf8bc02-839f-4b0d-af2e-05da7be4deb9")
+	)
+	(segment
+		(start 147.325 91.075)
+		(end 148.467894 91.075)
+		(width 0.3)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "d4e21ca7-0c3f-4c60-a3b2-b31b61cd1d74")
+	)
+	(segment
+		(start 152.495 98.95741)
+		(end 152.495 98.2)
+		(width 0.2)
+		(layer "F.Cu")
+		(net "/USB_D-")
+		(uuid "f298d816-3492-4631-9489-db75a79b0b14")
+	)
+	(segment
 		(start 154 79.4)
 		(end 154 78.025)
 		(width 0.8)
@@ -8580,150 +8798,6 @@
 		(uuid "9632c8be-c9b1-42dc-8295-0b6a55030cb9")
 	)
 	(segment
-		(start 153.26259 97.175)
-		(end 153.72741 97.175)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "0e58a39b-d3fe-4c2f-a318-26281d568523")
-	)
-	(segment
-		(start 153.995 97.44259)
-		(end 153.995 98.2)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "1654bbbc-f53c-4faa-8164-4517d1d8b66b")
-	)
-	(segment
-		(start 147.325 90.275)
-		(end 148.525 90.275)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "56039a79-0cd4-41b6-a76f-1d4a9a5f3f2d")
-	)
-	(segment
-		(start 152.995 97.3)
-		(end 152.995 98.2)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "5df2ca15-44e7-4430-8406-71d52e0d3e72")
-	)
-	(segment
-		(start 152.995 98.2)
-		(end 152.995 97.44259)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "6e1ff9d7-14c7-448b-b409-a1c428cd37a1")
-	)
-	(segment
-		(start 153.72741 97.175)
-		(end 153.995 97.44259)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "9092951b-78d1-4800-bc34-0f10baf2df42")
-	)
-	(segment
-		(start 152.995 97.44259)
-		(end 153.26259 97.175)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "958f8f03-e178-456b-a419-f0fd51ac4318")
-	)
-	(segment
-		(start 148.525 90.275)
-		(end 152.995 94.745)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "e023fff0-50b0-41d0-9153-7eff24cdcb8b")
-	)
-	(segment
-		(start 152.995 94.745)
-		(end 152.995 98.2)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/USB_D+")
-		(uuid "e389f646-cad9-46e5-b703-73d6f88cc696")
-	)
-	(segment
-		(start 152.76259 99.225)
-		(end 152.495 98.95741)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "3c0f5e3a-dba4-47f9-b6d0-e3803cad9d4f")
-	)
-	(segment
-		(start 152.495 95.102106)
-		(end 152.495 98.2)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "42f68817-305b-416d-bc46-2ae7256f836c")
-	)
-	(segment
-		(start 148.467894 91.075)
-		(end 152.495 95.102106)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "4da7fb96-7c70-4d2c-b53b-534c8d8bad0f")
-	)
-	(segment
-		(start 153.495 98.2)
-		(end 153.495 98.95741)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "595cf22c-dfa0-48e5-9253-242929af7784")
-	)
-	(segment
-		(start 153.55 98.7)
-		(end 153.55 97.9)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "676aa12b-8a00-4e85-9198-e822ba530b6a")
-	)
-	(segment
-		(start 153.22741 99.225)
-		(end 152.76259 99.225)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "9aca525e-ee7e-48a3-aad8-23b4bfb782b2")
-	)
-	(segment
-		(start 153.495 98.95741)
-		(end 153.22741 99.225)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "abf8bc02-839f-4b0d-af2e-05da7be4deb9")
-	)
-	(segment
-		(start 147.325 91.075)
-		(end 148.467894 91.075)
-		(width 0.3)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "d4e21ca7-0c3f-4c60-a3b2-b31b61cd1d74")
-	)
-	(segment
-		(start 152.495 98.95741)
-		(end 152.495 98.2)
-		(width 0.2)
-		(layer "F.Cu")
-		(net "/USB_D-")
-		(uuid "f298d816-3492-4631-9489-db75a79b0b14")
-	)
-	(segment
 		(start 145.85 88.949999)
 		(end 145.95 88.849999)
 		(width 0.5)
@@ -8906,54 +8980,6 @@
 		(layer "B.Cu")
 		(net "/SWDIO")
 		(uuid "fb2c965e-5ed4-4552-b000-b8ffe9e4a7f8")
-	)
-	(segment
-		(start 134.484506 80.38)
-		(end 141.15 87.045494)
-		(width 0.5)
-		(layer "F.Cu")
-		(net "/MCU_RX")
-		(uuid "75bcb03a-b245-4258-9975-f4b638cb4397")
-	)
-	(segment
-		(start 133.5 80.38)
-		(end 134.484506 80.38)
-		(width 0.5)
-		(layer "F.Cu")
-		(net "/MCU_RX")
-		(uuid "929ca6bd-488e-494d-8419-0533cb7a7add")
-	)
-	(segment
-		(start 141.15 87.045494)
-		(end 141.15 88.1)
-		(width 0.5)
-		(layer "F.Cu")
-		(net "/MCU_RX")
-		(uuid "cb9735f3-6e07-43db-a3b3-83386735f8fa")
-	)
-	(segment
-		(start 141.95 88.1)
-		(end 141.95 86.55)
-		(width 0.5)
-		(layer "F.Cu")
-		(net "/MCU_TX")
-		(uuid "0afa5e48-96c9-41d4-a2c8-722cf0e44803")
-	)
-	(segment
-		(start 141.95 86.55)
-		(end 134.51 79.11)
-		(width 0.5)
-		(layer "F.Cu")
-		(net "/MCU_TX")
-		(uuid "41884d1e-3244-4327-8345-8af6df5dc1ac")
-	)
-	(segment
-		(start 134.51 79.11)
-		(end 133.5 79.11)
-		(width 0.5)
-		(layer "F.Cu")
-		(net "/MCU_TX")
-		(uuid "9a6afa8f-6508-4b8c-947d-c9ff3ca67296")
 	)
 	(zone
 		(net "GND")
@@ -9571,7 +9597,7 @@
 				(xy 160.940665 81.875531) (xy 160.987356 81.92751) (xy 160.9995 81.981028) (xy 160.9995 104.0755)
 				(xy 160.979815 104.142539) (xy 160.927011 104.188294) (xy 160.8755 104.1995) (xy 158.583121 104.1995)
 				(xy 158.516082 104.179815) (xy 158.470327 104.127011) (xy 158.460383 104.057853) (xy 158.46856 104.028048)
-				(xy 158.510656 103.926414) (xy 158.527051 103.886835) (xy 158.543768 103.802796) (xy 158.5655 103.693543)
+				(xy 158.510656 103.926414) (xy 158.527051 103.886835) (xy 158.561966 103.711309) (xy 158.5655 103.693543)
 				(xy 158.5655 102.896456) (xy 158.527052 102.70317) (xy 158.527051 102.703169) (xy 158.527051 102.703165)
 				(xy 158.518012 102.681342) (xy 158.451635 102.521092) (xy 158.451628 102.521079) (xy 158.342139 102.357218)
 				(xy 158.342136 102.357214) (xy 158.202785 102.217863) (xy 158.202781 102.21786) (xy 158.03892 102.108371)
@@ -9584,7 +9610,7 @@
 				(xy 156.602947 103.886829) (xy 156.60295 103.886839) (xy 156.66144 104.028048) (xy 156.668909 104.097517)
 				(xy 156.637633 104.159996) (xy 156.577544 104.195648) (xy 156.546879 104.1995) (xy 149.943121 104.1995)
 				(xy 149.876082 104.179815) (xy 149.830327 104.127011) (xy 149.820383 104.057853) (xy 149.82856 104.028048)
-				(xy 149.870656 103.926414) (xy 149.887051 103.886835) (xy 149.903768 103.802796) (xy 149.9255 103.693543)
+				(xy 149.870656 103.926414) (xy 149.887051 103.886835) (xy 149.921966 103.711309) (xy 149.9255 103.693543)
 				(xy 149.9255 102.896456) (xy 149.887052 102.70317) (xy 149.887051 102.703169) (xy 149.887051 102.703165)
 				(xy 149.878012 102.681342) (xy 149.811635 102.521092) (xy 149.811628 102.521079) (xy 149.702139 102.357218)
 				(xy 149.702136 102.357214) (xy 149.562785 102.217863) (xy 149.562781 102.21786) (xy 149.39892 102.108371)
