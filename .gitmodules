@@ -1,0 +1,6 @@
+[submodule "tinyusb"]
+	path = tinyusb
+	url = https://github.com/hathach/tinyusb.git
+[submodule "RCP-Target"]
+	path = RCP-Target
+	url = https://github.com/liquid-rocketry-illinois/RCP-Target.git

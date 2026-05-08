@@ -79,7 +79,15 @@ void Error_Handler(void);
 #define RADIO_AUX_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
+    void Run();
+
+#ifdef __cplusplus
+  }
+#endif
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

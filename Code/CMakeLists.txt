@@ -11,6 +11,9 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
 
 
 # Define the build type
@@ -29,10 +32,27 @@ project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Enable CMake support for ASM and C languages
-enable_language(C ASM)
+enable_language(C CXX ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}
+        Core/Inc/Ebyte_E22_900T22S.h
+        Core/Src/Ebyte_E22_900T22S.cpp
+        Core/Src/usb_descriptors.c
+        ../tinyusb/src/tusb.c
+        ../tinyusb/src/common/tusb_fifo.c
+        ../tinyusb/src/device/usbd.c
+#        ../tinyusb/src/device/usbd_control.c
+        ../tinyusb/src/class/cdc/cdc_device.c
+        ../tinyusb/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c
+        ../tinyusb/src/portable/st/stm32_fsdev/fsdev_common.c
+        Core/Src/main.cpp
+        Core/Inc/Radio.h
+        Core/Src/Radio.cpp
+        ../RCP-Target/src/procedures.cpp
+        ../RCP-Target/src/RCPTarget.cpp
+        Core/Inc/RADIO_DEFNS.h
+)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -49,7 +69,12 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
+    ../tinyusb/src
+    ../tinyusb/src/common
+    ../tinyusb/src/device
+    ../RCP-Target/src/RCP_Target
+    ../RCP-Target/src
+    Core/Inc
 )
 
 # Add project symbols (macros)
