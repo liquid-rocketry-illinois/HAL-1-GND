@@ -36,22 +36,19 @@ enable_language(C CXX ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
-        Core/Inc/Ebyte_E22_900T22S.h
         Core/Src/Ebyte_E22_900T22S.cpp
         Core/Src/usb_descriptors.c
         ../tinyusb/src/tusb.c
         ../tinyusb/src/common/tusb_fifo.c
         ../tinyusb/src/device/usbd.c
-#        ../tinyusb/src/device/usbd_control.c
         ../tinyusb/src/class/cdc/cdc_device.c
         ../tinyusb/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c
         ../tinyusb/src/portable/st/stm32_fsdev/fsdev_common.c
         Core/Src/main.cpp
-        Core/Inc/Radio.h
         Core/Src/Radio.cpp
         ../RCP-Target/src/procedures.cpp
         ../RCP-Target/src/RCPTarget.cpp
-        Core/Inc/RADIO_DEFNS.h
+        Core/Src/DataHandling.cpp
 )
 
 # Add STM32CubeMX generated sources

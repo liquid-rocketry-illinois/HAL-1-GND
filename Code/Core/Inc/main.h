@@ -83,6 +83,7 @@ void Error_Handler(void);
   extern "C" {
 #endif
 
+    void Init();
     void Run();
 
 #ifdef __cplusplus

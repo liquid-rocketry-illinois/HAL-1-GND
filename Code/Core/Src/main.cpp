@@ -36,7 +36,8 @@ extern "C" void Init() {
     RCP::ESTOP_PROC = new Test::OneShot([]() { mainDev.EStop(); });
 
     // Init the only other device in use for ground station yippee
-    mainDev.Init();
+    int8_t status = mainDev.Init();
+    // breakpoint point
 }
 
 
@@ -48,9 +49,13 @@ LRI::RingBuf<uint8_t, 1024> inbuffer;
 // Extra temporary buffer to read from tinyusb
 uint8_t tempIn[64];
 
-// Unique structure for receiving HAL data. By using our own copy, we can tare/filter the values
+// Unique structure for receiving/sending HAL data. By using our own copy, we can tare/filter the values
 // and still be able to compare it to HAL's raw data
-telemetryData LocalGNDData;
+telemetryData LocalGNDData = {};
+GndStationData HALOutboundData = {};
+
+// stores data for taring and offset. sensors
+telemetryData LocalDataOffsets = {};
 
 extern "C" void Run() {
     tusb_rhport_init_t dev_init = {
@@ -77,7 +82,7 @@ extern "C" void Run() {
 
         // Update both parts.
         RCP::yield();
-        int8_t status = mainDev.Update();
+        int8_t status = mainDev.Update(&LocalGNDData);
     }
 }
 
@@ -96,33 +101,152 @@ uint32_t RCP::systime() { return HAL_GetTick(); }
 
 // ============= Callback Implementations =============
 
+RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
+    switch (id) {
+        //
+        case 0:
+            return (LocalGNDData.pyroMainDrogueFired == 1) ? RCP_SIMPLE_ACTUATOR_ON : RCP_SIMPLE_ACTUATOR_OFF;
+        case 1:
+            return (LocalGNDData.pyroBackupDrogueFired == 1) ? RCP_SIMPLE_ACTUATOR_ON : RCP_SIMPLE_ACTUATOR_OFF;
+        case 2:
+            return (LocalGNDData.pyroMainChuteFired == 1) ? RCP_SIMPLE_ACTUATOR_ON : RCP_SIMPLE_ACTUATOR_OFF;
+        case 3:
+            // This is the command byte stuff
+            switch (LocalGNDData.CommandResponseByte) {
+            // Sensor and status issues start at 0 going up
+                case 0:
+                    RCPDebug("All Nominal");
+                case 1:
+                    RCPDebug("Radio Connection Issue!");
+                case 2:
+                    RCPDebug("Servo tolerance Issue!");
+                // More error codes may be added to account for other things
+
+            // Controls and CONOPs issues start at 255 going down
+                case 255:
+                    RCPDebug("Main Drogue Triggered");
+                case 254:
+                    RCPDebug("Backup Drogue Triggered");
+                case 253:
+                    RCPDebug("Main Chute Triggered");
+                case 252:
+                    RCPDebug("Burnout. Starting Roll-CTRL");
+                case 251:
+                    RCPDebug("Roll CTRL Deactivated!");
+                case 250:
+                    RCPDebug("WARNING Horizontal drift notable!");
+
+                default:
+                    RCPDebug("Unknown Command Response!");
+            }
+            return RCP_SIMPLE_ACTUATOR_TOGGLE; // Keep track of continuous updating if debug msg is the same
+        default:
+            return RCP_SIMPLE_ACTUATOR_OFF;
+    }
+}
+
+RCP_SimpleActuatorState RCP::simpleActuatorWrite_CLBK(uint8_t id, RCP_SimpleActuatorState state) {
+    switch (id) {
+        case 0:
+            if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYRODROGUEMAIN;
+        case 1:
+            if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYRODROGUEBKP;
+        case 2:
+            if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYROMAIN;
+
+        // For writing to HAL, only the ABORT signal is needed. Everything else is handled automatically
+        // including the cmd-ack. Therefore case 3 for the last state isn't needed. Instead we'll use
+        // it for deflection testing
+        case 3:
+            // Using 150 just because
+            if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.CommandByte = 150;
+        default:
+            HALOutboundData.pyroActivation = 0;
+            HALOutboundData.CommandByte = 0;
+    }
+    return RCP_SIMPLE_ACTUATOR_OFF;
+}
+
+// Callback for reading from sensor device. Automatic data streaming is handled inside the various singletons
+RCP::Floats4 RCP::readSensor(RCP_DeviceClass devclass, uint8_t id) {
+    Floats4 floats;
+
+    // Switch on the device class, then load the floats structure with the appropriate data
+    switch(devclass) {
+        case RCP_DEVCLASS_ANGLED_ACTUATOR:
+            floats.vals[0] = LocalGNDData.servoPos1;
+            floats.vals[1] = LocalGNDData.servoPos2;
+            break;
+
+        case RCP_DEVCLASS_ALTITUDE:
+            floats.vals[0] = LocalGNDData.altitude;
+            break;
+
+        case RCP_DEVCLASS_GPS:
+            floats.vals[0] = LocalGNDData.latitude;
+            floats.vals[1] = LocalGNDData.longitude;
+            floats.vals[2] = LocalGNDData.GPSaltitude;
+            break;
+
+        case RCP_DEVCLASS_GYROSCOPE:
+            floats.vals[0] = LocalGNDData.mGyrX;
+            floats.vals[1] = LocalGNDData.mGyrY;
+            floats.vals[2] = LocalGNDData.mGyrZ;
+            break;
+
+        case RCP_DEVCLASS_QUATERNION:
+            floats.vals[0] = LocalGNDData.Qw;
+            floats.vals[1] = LocalGNDData.Qx;
+            floats.vals[2] = LocalGNDData.Qy;
+            floats.vals[3] = LocalGNDData.Qz;
+            break;
+
+        case RCP_DEVCLASS_RPY:
+            floats.vals[0] = LocalGNDData.roll;
+            floats.vals[1] = LocalGNDData.pitch;
+            floats.vals[2] = LocalGNDData.yaw;
+            break;
+
+        case RCP_DEVCLASS_RADIO_STRENGTH:
+            floats.vals[0] = LocalGNDData.RSSI;
+            break;
+
+        case RCP_DEVCLASS_TEMPERATURE:
+            floats.vals[0] = LocalGNDData.temperature;
+            break;
+
+        default:
+            break;
+    }
+
+    return floats;
+}
+
 // Tare local values so HAL can just send all the raw data
 void RCP::writeSensorTare(RCP_DeviceClass devclass, uint8_t id, [[maybe_unused]] uint8_t dataChannel, float tareVal) {
     switch(devclass) {
         // Servo motors have a built in zero state but with this,
-        // we can set a specific value to be zero
-        case RCP_DEVCLASS_MOTOR:
-
+        // we can set a specific value to be zero.
+        // This controls a rocket-side item, this data is sent to HAL...
+        case RCP_DEVCLASS_ANGLED_ACTUATOR:
+            if (id == 0) HALOutboundData.servoOffset1 = tareVal;
+            if (id == 1) HALOutboundData.servoOffset2 = tareVal;
             break;
 
-        case RCP_DEVCLASS_ACCELEROMETER:
+            // NOTE: accelerometer and gyroscope are not zeroed. we need what the sensor detects
 
-            break;
-
-        case RCP_DEVCLASS_GYROSCOPE:
-
-            break;
-
+            // ...but for most the change only needs to be local.
         case RCP_DEVCLASS_ALTITUDE:
-
+            LocalDataOffsets.altitude   = LocalGNDData.altitude;
             break;
 
         case RCP_DEVCLASS_RPY: // this is positional, not a rate
-
+            LocalDataOffsets.roll       = LocalGNDData.roll;
+            LocalDataOffsets.pitch      = LocalGNDData.pitch;
+            LocalDataOffsets.yaw        = LocalGNDData.yaw;
             break;
 
         default:
-
             break;
     }
 }

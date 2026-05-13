@@ -10,12 +10,17 @@
 #include <cstring>
 #include "RADIO_DEFNS.h"
 #include "RCP_Target.h"
+#include "DataHandling.h"
 
 extern UART_HandleTypeDef huart1;
 
 Radio::Radio() {
     RXSize = sizeof(RXBuf);
     TXSize = sizeof(TXBuf);
+}
+
+telemetryData Radio::GetRXData() {
+    return RX_Data;
 }
 
 int8_t Radio::Init() {
@@ -62,10 +67,17 @@ int8_t Radio::Init() {
     return 0;
 }
 
-int8_t Radio::Update() {
+extern GndStationData HALOutboundData;
+
+int8_t Radio::Update(telemetryData* GNDLocalData) {
     if (e22_initialized()) {
+        // Simply receive data and apply tare logic
         ReceiveData(RX_Data);
-        TransmitData(TX_Data);
+        Update_Local_Data();
+        // Transmit data with RCI/RCP processes
+        TransmitData(HALOutboundData);
+
+        // Now we can do the rest of RCP's stuff. We send the new RX data to be displayed by RCI.
         static uint32_t timeLastLogged = HAL_GetTick();
 
         if(RCP::getDataStreaming() && HAL_GetTick() - timeLastLogged > 10) {
@@ -87,11 +99,18 @@ int8_t Radio::Update() {
             RCP::sendFourFloat(RCP_DEVCLASS_QUATERNION, 0,
                         {RX_Data.Qw, RX_Data.Qx, RX_Data.Qy, RX_Data.Qz});
 
-            RCP::sendTwoFloat(RCP_DEVCLASS_MOTOR, 0,
+            RCP::sendTwoFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 0,
                         {RX_Data.servoPos1, RX_Data.servoPos2});
 
             RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, RX_Data.RSSI);
-            // TODO send CMD response byte, pyro states
+
+            // pyros in order of trigger
+            RCP::forceSendSimpleActuatorState(0);
+            RCP::forceSendSimpleActuatorState(1);
+            RCP::forceSendSimpleActuatorState(2);
+
+            // command byte
+            RCP::forceSendSimpleActuatorState(3);
         }
         return 0;
     }
@@ -100,7 +119,7 @@ int8_t Radio::Update() {
 }
 
 void Radio::EStop() {
-     TX_Data.CommandByte = BYTE_ABORT;
+    TX_Data.CommandByte = BYTE_ABORT;
 }
 
 
