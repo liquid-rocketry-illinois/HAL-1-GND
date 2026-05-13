@@ -48,8 +48,9 @@ LRI::RingBuf<uint8_t, 1024> inbuffer;
 // Extra temporary buffer to read from tinyusb
 uint8_t tempIn[64];
 
-constexpr float VENT_THRESHOLD = 600;
-bool prevVenting = false;
+// Unique structure for receiving HAL data. By using our own copy, we can tare/filter the values
+// and still be able to compare it to HAL's raw data
+telemetryData LocalGNDData;
 
 extern "C" void Run() {
     tusb_rhport_init_t dev_init = {
@@ -95,19 +96,33 @@ uint32_t RCP::systime() { return HAL_GetTick(); }
 
 // ============= Callback Implementations =============
 
+// Tare local values so HAL can just send all the raw data
 void RCP::writeSensorTare(RCP_DeviceClass devclass, uint8_t id, [[maybe_unused]] uint8_t dataChannel, float tareVal) {
     switch(devclass) {
         // Servo motors have a built in zero state but with this,
         // we can set a specific value to be zero
         case RCP_DEVCLASS_MOTOR:
-            // implement tare
+
             break;
 
-        case RCP_DEVCLASS_PRESSURE_TRANSDUCER:
-            // implement tare
+        case RCP_DEVCLASS_ACCELEROMETER:
+
+            break;
+
+        case RCP_DEVCLASS_GYROSCOPE:
+
+            break;
+
+        case RCP_DEVCLASS_ALTITUDE:
+
+            break;
+
+        case RCP_DEVCLASS_RPY: // this is positional, not a rate
+
             break;
 
         default:
+
             break;
     }
 }
