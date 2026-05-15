@@ -23,16 +23,16 @@ Radio mainDev;
 
 extern "C" void Init() {
     // Init tinyusb
-    tud_rhport_init(BOARD_TUD_RHPORT, &TUSB_INIT_DATA);
+    bool tusbstate = tud_rhport_init(BOARD_TUD_RHPORT, &TUSB_INIT_DATA);
 
     // Wait for the DCR line to go high (set by RCI)
     while(!(tud_cdc_get_line_state() & 0x01)) {
         tud_task_ext(5, false);
     }
     HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
-    HAL_Delay(10);
+    HAL_Delay(100);
     HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
-    HAL_Delay(10);
+    HAL_Delay(100);
 
     // Init the various different parts of the code
     RCP::init();
@@ -41,16 +41,16 @@ extern "C" void Init() {
     // Assign the E-STOP button functionality
     RCP::ESTOP_PROC = new Test::OneShot([]() { mainDev.EStop(); });
     HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
-    HAL_Delay(10);
+    HAL_Delay(100);
     HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
-    HAL_Delay(10);
+    HAL_Delay(100);
     // Init the only other device in use for ground station yippee
     int8_t status = mainDev.Init();
     if (status == 0) {
         HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
-        HAL_Delay(10);
+        HAL_Delay(100);
         HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
-        HAL_Delay(10);
+        HAL_Delay(100);
     }
     // breakpoint point
 }
