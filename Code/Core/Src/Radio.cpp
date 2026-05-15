@@ -72,7 +72,11 @@ extern GndStationData HALOutboundData;
 int8_t Radio::Update(telemetryData* GNDLocalData) {
     if (e22_initialized()) {
         // Simply receive data and apply tare logic
-        ReceiveData(RX_Data);
+        if (ReceiveData(RX_Data)) {
+            HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+            HAL_Delay(10);
+            HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
+        }
         Update_Local_Data();
         // Transmit data with RCI/RCP processes
         TransmitData(HALOutboundData);

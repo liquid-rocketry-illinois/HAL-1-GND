@@ -9,6 +9,8 @@
 #include "tusb.h"
 #pragma GCC diagnostic pop
 
+#include "main.h"
+
 #include "Radio.h"
 #include "RCP_Target.h"
 #include "tusb.h"
@@ -27,6 +29,10 @@ extern "C" void Init() {
     while(!(tud_cdc_get_line_state() & 0x01)) {
         tud_task_ext(5, false);
     }
+    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+    HAL_Delay(10);
+    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
+    HAL_Delay(10);
 
     // Init the various different parts of the code
     RCP::init();
@@ -34,9 +40,18 @@ extern "C" void Init() {
 
     // Assign the E-STOP button functionality
     RCP::ESTOP_PROC = new Test::OneShot([]() { mainDev.EStop(); });
-
+    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+    HAL_Delay(10);
+    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
+    HAL_Delay(10);
     // Init the only other device in use for ground station yippee
     int8_t status = mainDev.Init();
+    if (status == 0) {
+        HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+        HAL_Delay(10);
+        HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
+        HAL_Delay(10);
+    }
     // breakpoint point
 }
 
