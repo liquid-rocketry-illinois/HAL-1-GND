@@ -22,8 +22,20 @@ tusb_rhport_init_t TUSB_INIT_DATA = {.role = TUSB_ROLE_DEVICE, .speed = TUSB_SPE
 Radio mainDev;
 
 extern "C" void Init() {
+
     // Init tinyusb
     bool tusbstate = tud_rhport_init(BOARD_TUD_RHPORT, &TUSB_INIT_DATA);
+    char buffer[] = "hi lol";
+    uint32_t t = 0;
+
+    while (1) {
+        tud_task_ext(1, 0);
+        if (HAL_GetTick() - t > 1000) {
+            t = HAL_GetTick();
+            tud_cdc_write(buffer, sizeof(buffer));
+            tud_cdc_write_flush();
+        }
+    }
 
     // Wait for the DCR line to go high (set by RCI)
     while(!(tud_cdc_get_line_state() & 0x01)) {
