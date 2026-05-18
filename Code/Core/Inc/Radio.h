@@ -28,7 +28,7 @@ typedef struct
 typedef struct
 {
     float altitude; // new
-    float longitude, latitude, GPSaltitude; // your implementation used four iirc
+    float longitude, latitude, GPSaltitude;
     float mAccX, mAccY, mAccZ; // imu stuff
     float mGyrX, mGyrY, mGyrZ; // imu stuff
     float Qx, Qy, Qz, Qw; // new (quaternions)

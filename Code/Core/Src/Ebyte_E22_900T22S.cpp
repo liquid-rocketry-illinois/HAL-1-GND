@@ -119,7 +119,8 @@ int8_t init_e22_900t22s(config_e22_900t22s *cfg)
     /* read current radio configuration */
     config_e22_900t22s current_cfg = {};
 
-    writeConfig_e22_900t22s(cfg, true);
+    if (writeConfig_e22_900t22s(cfg, true) != E22_OK)
+        return E22_ERR_UART;
 
     if (readConfig_e22_900t22s(&current_cfg) != E22_OK)
         return E22_ERR_UART;
@@ -235,7 +236,6 @@ int8_t writeConfig_e22_900t22s(
 
     //xSemaphoreTake(e22_mutex, portMAX_DELAY);
 
-    changeMode(CONFIG);
     // Ensure that config can be written
     HAL_Delay(400);
 
@@ -247,14 +247,28 @@ int8_t writeConfig_e22_900t22s(
         return E22_ERR_UART;
     }
 
-    /* The E22 echoes back the written registers as confirmation:
-     * [C1 00 07 ADDH ADDL NETID REG0 REG1 REG2 REG3] (10 bytes).
-     * Must be consumed here — it sits in the MCU UART buffer regardless of
-     * when changeMode(TRANS) is called, and shifts the next uartRead() by 1 byte. */
-    uint8_t _echo[10];
-    uartRead(_echo, 10);
+    /* Read the write echo. E22 responds with [C1][addr][len][data...], possibly
+     * preceded by a 0x00 preamble byte. Scan for the three header bytes rather
+     * than assuming a fixed offset. */
+    uint8_t _echo[11] = {0};
+    uartRead(_echo, sizeof(_echo));
 
-    changeMode(TRANS);
+    bool echo_ok = false;
+    for(uint8_t i = 0; i + 2 < sizeof(_echo); i++)
+    {
+        if(_echo[i]     == COMMAND_BYTE_READ_CFG &&
+           _echo[i + 1] == frame[1] &&
+           _echo[i + 2] == frame[2])
+        {
+            echo_ok = true;
+            break;
+        }
+    }
+    if(!echo_ok)
+    {
+        //xSemaphoreGive(e22_mutex);
+        return E22_ERR_DATA_VERIFICATION;
+    }
 
     e22_cfg = *cfg;
     //xSemaphoreGive(e22_mutex);
@@ -267,42 +281,46 @@ int8_t readConfig_e22_900t22s(config_e22_900t22s *cfg)
     cmd[0] = COMMAND_BYTE_READ_CFG;
     cmd[1] = 0x00; // Start from ADDH
     cmd[2] = 0x07; // Read all necessary registers
-    uint8_t resp[10] = {0};
-    // resp: {c1, 00, 07, addh, addl, netid, reg0, reg1, reg2, reg3}
+    uint8_t resp[11] = {0};
 
     //xSemaphoreTake(e22_mutex, portMAX_DELAY);
 
-    changeMode(CONFIG);
-
     // Process mode switch in case aux pin logic is messed
-    HAL_Delay(500);
-    waitAux_e22_900t22s(1000); // shouldn't need this but just in case
+    HAL_Delay(200);
+    waitAux_e22_900t22s(1000); // wait until module is ready in CONFIG mode
 
-    uartWrite(cmd,3);
-    int8_t rslt = uartRead(resp,10);
+    uartWrite(cmd, 3);
+    int8_t rslt = uartRead(resp, sizeof(resp));
     if(rslt != E22_OK)
     {
         //xSemaphoreGive(e22_mutex);
         return E22_ERR_UART;
     }
 
-    // first three values are just repetition of sent data
-    if (resp[0] != cmd[0] ||
-        resp[1] != cmd[1] ||
-        resp[2] != cmd[2])
+    // Scan for [C1][addr][len] header — tolerates a leading 0x00 preamble byte
+    int8_t off = -1;
+    for(uint8_t i = 0; i + 2 < sizeof(resp); i++)
+    {
+        if(resp[i]     == cmd[0] &&
+           resp[i + 1] == cmd[1] &&
+           resp[i + 2] == cmd[2])
+        {
+            off = (int8_t)i;
+            break;
+        }
+    }
+    if(off < 0)
         return E22_ERR_DATA_VERIFICATION;
 
-    cfg->ADDH   = resp[3];
-    cfg->ADDL   = resp[4];
-    cfg->NETID  = resp[5];
-    cfg->REG0   = resp[6];
-    cfg->REG1   = resp[7];
-    cfg->REG2   = resp[8];
-    cfg->REG3   = resp[9];
+    cfg->ADDH   = resp[off + 3];
+    cfg->ADDL   = resp[off + 4];
+    cfg->NETID  = resp[off + 5];
+    cfg->REG0   = resp[off + 6];
+    cfg->REG1   = resp[off + 7];
+    cfg->REG2   = resp[off + 8];
+    cfg->REG3   = resp[off + 9];
 
     //xSemaphoreGive(e22_mutex);
-
-    changeMode(TRANS);
 
     return E22_OK;
 }
@@ -415,7 +433,9 @@ void setAddress_e22_900t22s(uint16_t address)
     e22_cfg.ADDH = (address >> 8);
     e22_cfg.ADDL = (address & 0xFF);
 
+    changeMode(CONFIG);
     writeConfig_e22_900t22s(&e22_cfg,false);
+    changeMode(TRANS);
 }
 
 uint16_t getAddress_e22_900t22s(void)
@@ -428,7 +448,9 @@ uint16_t getAddress_e22_900t22s(void)
 void changeOpFreq_e22_900t22s(R2_E22Channel915 channel)
 {
     e22_cfg.REG2 = channel;
+    changeMode(CONFIG);
     writeConfig_e22_900t22s(&e22_cfg,false);
+    changeMode(TRANS);
 }
 
 R2_E22Channel915 getOpFreq_e22_900t22s(void)
@@ -443,7 +465,9 @@ void setAirDataRate_e22_900t22s(R0_210_E22_AIR_DATA_RATE rate)
     e22_cfg.REG0 &= ~0x07;
     e22_cfg.REG0 |= rate;
 
+    changeMode(CONFIG);
     writeConfig_e22_900t22s(&e22_cfg,false);
+    changeMode(TRANS);
 }
 
 void setUARTBaud_e22_900t22s(R0_765_E22_UART_BAUD baud)
@@ -451,7 +475,9 @@ void setUARTBaud_e22_900t22s(R0_765_E22_UART_BAUD baud)
     e22_cfg.REG0 &= ~(0b111 << 5);
     e22_cfg.REG0 |= baud;
 
+    changeMode(CONFIG);
     writeConfig_e22_900t22s(&e22_cfg,false);
+    changeMode(TRANS);
 }
 
 void setTxPower_e22_900t22s(R1_10_E22_TX_POWER power)
@@ -459,7 +485,9 @@ void setTxPower_e22_900t22s(R1_10_E22_TX_POWER power)
     e22_cfg.REG1 &= ~0x03;
     e22_cfg.REG1 |= power;
 
+    changeMode(CONFIG);
     writeConfig_e22_900t22s(&e22_cfg,false);
+    changeMode(TRANS);
 }
 
 /* ================= RESET ================= */

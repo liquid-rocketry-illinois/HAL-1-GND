@@ -25,26 +25,11 @@ extern "C" void Init() {
 
     // Init tinyusb
     bool tusbstate = tud_rhport_init(BOARD_TUD_RHPORT, &TUSB_INIT_DATA);
-    char buffer[] = "hi lol";
-    uint32_t t = 0;
-
-    while (1) {
-        tud_task_ext(1, 0);
-        if (HAL_GetTick() - t > 1000) {
-            t = HAL_GetTick();
-            tud_cdc_write(buffer, sizeof(buffer));
-            tud_cdc_write_flush();
-        }
-    }
 
     // Wait for the DCR line to go high (set by RCI)
     while(!(tud_cdc_get_line_state() & 0x01)) {
         tud_task_ext(5, false);
     }
-    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
-    HAL_Delay(100);
 
     // Init the various different parts of the code
     RCP::init();
@@ -52,15 +37,21 @@ extern "C" void Init() {
 
     // Assign the E-STOP button functionality
     RCP::ESTOP_PROC = new Test::OneShot([]() { mainDev.EStop(); });
-    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
-    HAL_Delay(100);
+
     // Init the only other device in use for ground station yippee
     int8_t status = mainDev.Init();
     if (status == 0) {
+        // Signal start
         HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+        HAL_Delay(50);
+        HAL_GPIO_TogglePin(BZR_GPIO_Port, BZR_Pin);
         HAL_Delay(100);
+        HAL_GPIO_TogglePin(BZR_GPIO_Port, BZR_Pin);
+        HAL_Delay(50);
+        HAL_GPIO_TogglePin(BZR_GPIO_Port, BZR_Pin);
+        HAL_Delay(100);
+        HAL_GPIO_TogglePin(BZR_GPIO_Port, BZR_Pin);
+        HAL_Delay(50);
         HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         HAL_Delay(100);
     }
@@ -80,6 +71,8 @@ uint8_t tempIn[64];
 // and still be able to compare it to HAL's raw data
 telemetryData LocalGNDData = {};
 GndStationData HALOutboundData = {};
+uint32_t tick1 = HAL_GetTick();
+uint32_t tick2 = HAL_GetTick();
 
 // stores data for taring and offset. sensors
 telemetryData LocalDataOffsets = {};
@@ -137,39 +130,42 @@ RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
             return (LocalGNDData.pyroBackupDrogueFired == 1) ? RCP_SIMPLE_ACTUATOR_ON : RCP_SIMPLE_ACTUATOR_OFF;
         case 2:
             return (LocalGNDData.pyroMainChuteFired == 1) ? RCP_SIMPLE_ACTUATOR_ON : RCP_SIMPLE_ACTUATOR_OFF;
+        default:
+            ;
+    }
+    switch (LocalGNDData.CommandResponseByte) {
+        // Sensor and status issues start at 0 going up
+        case 0:
+            RCPDebug("All Nominal");
+        case 1:
+            RCPDebug("Radio Connection Issue!");
         case 3:
-            // This is the command byte stuff
-            switch (LocalGNDData.CommandResponseByte) {
-            // Sensor and status issues start at 0 going up
-                case 0:
-                    RCPDebug("All Nominal");
-                case 1:
-                    RCPDebug("Radio Connection Issue!");
-                case 2:
-                    RCPDebug("Servo tolerance Issue!");
-                // More error codes may be added to account for other things
+            RCPDebug("Servo tolerance Issue!");
+            // More codes may be added to account for other things
+
+            // HAL Response to ping from ground station
+        case 100:
+            RCPDebug("HAL acknowledged ping.");
 
             // Controls and CONOPs issues start at 255 going down
-                case 255:
-                    RCPDebug("Main Drogue Triggered");
-                case 254:
-                    RCPDebug("Backup Drogue Triggered");
-                case 253:
-                    RCPDebug("Main Chute Triggered");
-                case 252:
-                    RCPDebug("Burnout. Starting Roll-CTRL");
-                case 251:
-                    RCPDebug("Roll CTRL Deactivated!");
-                case 250:
-                    RCPDebug("WARNING Horizontal drift notable!");
+        case 255:
+            RCPDebug("Main Drogue Triggered");
+        case 254:
+            RCPDebug("Backup Drogue Triggered");
+        case 253:
+            RCPDebug("Main Chute Triggered");
+        case 252:
+            RCPDebug("Burnout. Starting Roll-CTRL");
+        case 251:
+            RCPDebug("Roll CTRL Deactivated!");
+        case 250:
+            RCPDebug("WARNING Horizontal drift notable!");
 
-                default:
-                    RCPDebug("Unknown Command Response!");
-            }
-            return RCP_SIMPLE_ACTUATOR_TOGGLE; // Keep track of continuous updating if debug msg is the same
         default:
-            return RCP_SIMPLE_ACTUATOR_OFF;
+            RCPDebug("Unknown Command Response!");
     }
+
+    return RCP_SIMPLE_ACTUATOR_OFF;
 }
 
 RCP_SimpleActuatorState RCP::simpleActuatorWrite_CLBK(uint8_t id, RCP_SimpleActuatorState state) {

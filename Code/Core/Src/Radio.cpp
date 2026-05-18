@@ -74,9 +74,8 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
         // Simply receive data and apply tare logic
         if (ReceiveData(RX_Data)) {
             HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
-            HAL_Delay(10);
-            HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         }
+        else HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         Update_Local_Data();
         // Transmit data with RCI/RCP processes
         TransmitData(HALOutboundData);
@@ -203,8 +202,8 @@ uint8_t Radio::encodeAndSend(const T &payload)
     uint8_t payload_len = sizeof(T);
 
     // fixed mode header — module strips these before delivering to receiver
-    TXBuf[0] = GND_RADIO_ADDRHIGH;
-    TXBuf[1] = GND_RADIO_ADDRLOW;
+    TXBuf[0] = HAL1_RADIO_ADDRHIGH;
+    TXBuf[1] = HAL1_RADIO_ADDRLOW;
 
     TXBuf[2] = CH915;
 
