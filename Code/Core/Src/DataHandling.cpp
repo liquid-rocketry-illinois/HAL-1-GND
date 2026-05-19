@@ -25,4 +25,11 @@ void Update_Local_Data() {
     LocalGNDData.roll -= LocalDataOffsets.roll;
     LocalGNDData.pitch -= LocalDataOffsets.pitch;
     LocalGNDData.yaw -= LocalDataOffsets.yaw;
+
+    // If angle exceeds 30, stop the rocket control algorithm.
+    // This function is also present on the rocket. Ensures that
+    // abort is acheived.
+    if (LocalGNDData.pitch > 30 || LocalGNDData.yaw > 30) {
+        mainDev.EStop();
+    }
 }

@@ -122,7 +122,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
 }
 
 void Radio::EStop() {
-    TX_Data.CommandByte = BYTE_ABORT;
+    e_stopped = true;
 }
 
 
@@ -139,7 +139,13 @@ int8_t Radio::ReceiveData(telemetryData &dat) {
 }
 
 int8_t Radio::TransmitData(const GndStationData &dat) {
-    encodeAndSend(dat);
+    if(e_stopped) {
+        GndStationData abortDat = dat;
+        abortDat.CommandByte = BYTE_ABORT;
+        encodeAndSend(abortDat);
+    } else {
+        encodeAndSend(dat);
+    }
     return 0;
 }
 

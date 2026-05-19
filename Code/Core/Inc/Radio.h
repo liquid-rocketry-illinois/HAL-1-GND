@@ -59,6 +59,7 @@ private:
     config_e22_900t22s cfg;
     uint8_t TXBuf[512], RXBuf[2048];
     int16_t lastSeq = 0;
+    bool e_stopped = false;
 
     // RX data is data received from HAL (IMU, GPS, data from sensors, etc)
     telemetryData RX_Data = {};
