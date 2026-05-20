@@ -23,6 +23,11 @@ telemetryData Radio::GetRXData() {
     return RX_Data;
 }
 
+float Radio::getRSSI()
+{
+    return RSSILocal;
+}
+
 int8_t Radio::Init() {
     config_e22_900t22s des_cfg = {};
 
@@ -68,14 +73,68 @@ int8_t Radio::Init() {
 }
 
 extern GndStationData HALOutboundData;
+// 1-second success-rate window → beep duration + period mapping:
+//   <10%  success → silent
+//   10–24%        → 10 ms on,  2000 ms period
+//   25–49%        → 20 ms on,  1000 ms period
+//   50–74%        → 50 ms on,   500 ms period
+//   75–97%        → 100 ms on,  250 ms period
+//   >97%          → constant on
+static uint32_t bzr_window_start = 0;
+static uint16_t bzr_total        = 0;
+static uint16_t bzr_success      = 0;
+static uint16_t bzr_beep_ms      = 0;      // 0 = silent, 0xFFFF = constant on
+static uint32_t bzr_period_ms    = 2000;
+static uint32_t bzr_pulse_start  = 0;
+static bool     bzr_pulsing      = false;
 
 int8_t Radio::Update(telemetryData* GNDLocalData) {
     if (e22_initialized()) {
-        // Simply receive data and apply tare logic
-        if (ReceiveData(RX_Data)) {
-            HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+        uint32_t now = HAL_GetTick();
+
+        // Start a pulse before the blocking UART call so the pin goes HIGH
+        // at a known time. The RESET check runs immediately after receive
+        // returns, minimising the extra on-time caused by UART blocking.
+        if (bzr_beep_ms != 0xFFFF && bzr_beep_ms != 0) {
+            if (!bzr_pulsing && now - bzr_pulse_start >= bzr_period_ms) {
+                bzr_pulsing = true;
+                bzr_pulse_start = now;
+                HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+            }
         }
-        else HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
+
+        int8_t rx_result = ReceiveData(RX_Data);
+        now = HAL_GetTick(); // refresh after the blocking call
+
+        // accumulate stats for this 1-second window
+        bzr_total++;
+        if (rx_result == 0) bzr_success++;
+
+        // recompute beep duration + period once per second
+        if (now - bzr_window_start >= 1000u) {
+            uint32_t succ_pct = bzr_total ? (bzr_success * 100u) / bzr_total : 0u;
+            if      (succ_pct >  97u) { bzr_beep_ms = 0xFFFF; bzr_period_ms = 0;    }
+            else if (succ_pct >= 75u) { bzr_beep_ms = 100;    bzr_period_ms = 250;  }
+            else if (succ_pct >= 50u) { bzr_beep_ms = 50;     bzr_period_ms = 500;  }
+            else if (succ_pct >= 25u) { bzr_beep_ms = 20;     bzr_period_ms = 750;  }
+            else if (succ_pct >= 10u) { bzr_beep_ms = 10;     bzr_period_ms = 1000; }
+            else                      { bzr_beep_ms = 0;      bzr_period_ms = 0;    }
+            bzr_total = bzr_success = 0;
+            bzr_window_start = now;
+        }
+
+        // drive buzzer — RESET check runs right after receive returns
+        if (bzr_beep_ms == 0xFFFF) {
+            HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
+        } else if (bzr_beep_ms == 0) {
+            HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
+        } else if (bzr_pulsing && now - bzr_pulse_start >= bzr_beep_ms) {
+            bzr_pulsing = false;
+            HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
+        }
+
+        RSSILocal = getRSSIByte();
+
         Update_Local_Data();
         // Transmit data with RCI/RCP processes
         TransmitData(HALOutboundData);
@@ -94,7 +153,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             RCP::sendThreeFloat(RCP_DEVCLASS_GPS, 0,
                         {RX_Data.latitude, RX_Data.longitude, RX_Data.altitude});
 
-            RCP::sendOneFloat(RCP_DEVCLASS_ALTITUDE, 0, RX_Data.altitude);
+            RCP::sendTwoFloat(RCP_DEVCLASS_ALTITUDE, 0, {RX_Data.altitude, RX_Data.verticalVelocity});
 
             RCP::sendThreeFloat(RCP_DEVCLASS_RPY, 0,
                         {RX_Data.roll, RX_Data.pitch, RX_Data.yaw});
@@ -105,7 +164,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             RCP::sendTwoFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 0,
                         {RX_Data.servoPos1, RX_Data.servoPos2});
 
-            RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, RX_Data.RSSI);
+            RCP::sendTwoFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, {RX_Data.RSSI, RSSILocal});
 
             // pyros in order of trigger
             RCP::forceSendSimpleActuatorState(0);

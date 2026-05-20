@@ -14,7 +14,6 @@
 #define CFG_TUD_MAX_SPEED                   BOARD_DEVICE_RHPORT_SPEED
 #define CFG_TUSB_MEM_ALIGN                  __attribute__ ((aligned(4)))
 #define USB_VID                             0xCAFE
-#define USB_PID                             0x0001
 #define USB_BCD                             0x0200
 // #define CFG_TUD_ENDPPOINT_MAX               8
 

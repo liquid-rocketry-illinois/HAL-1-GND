@@ -1,6 +1,7 @@
 #include "tusb.h"
 
 #define _PID_MAP(itf, n) ((CFG_TUD_##itf) << (n))
+#undef USB_PID
 #define USB_PID (0x4000 | _PID_MAP(CDC, 0))
 
 tusb_desc_device_t const desc_device = {
@@ -30,7 +31,7 @@ uint8_t const * tud_descriptor_device_cb(void) {
 #define EPNUM_CDC_IN     0x82
 
 uint8_t const desc_configuration[] = {
-    TUD_CONFIG_DESCRIPTOR(1, 2, 0, CONFIG_TOTAL_LEN, 0x00, 100),
+    TUD_CONFIG_DESCRIPTOR(1, 2, 0, CONFIG_TOTAL_LEN, 0x80, 100),
     TUD_CDC_DESCRIPTOR(0, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
 };
 

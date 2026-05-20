@@ -29,6 +29,8 @@ int16_t recieve_e22_900t22s(uint8_t *buffer, uint16_t expected_payload_len);
 inline volatile bool e22_data_ready = false;
 bool e22_available(void);
 
+float getRSSIByte();
+
 // Switch from trans, WOR, config, and off modes
 void changeMode(EBYTE_MODE mode);
 void changeOpFreq_e22_900t22s(R2_E22Channel915 channel);

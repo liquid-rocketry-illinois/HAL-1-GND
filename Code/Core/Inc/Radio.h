@@ -28,6 +28,7 @@ typedef struct
 typedef struct
 {
     float altitude; // new
+    float verticalVelocity;
     float longitude, latitude, GPSaltitude;
     float mAccX, mAccY, mAccZ; // imu stuff
     float mGyrX, mGyrY, mGyrZ; // imu stuff
@@ -38,7 +39,7 @@ typedef struct
     float temperature; // use averaged temperatures from BMP390L and BMI323 TMR
     uint8_t callsign[12] = {75, 69, 57, 69, 82, 73, 95, 65, 76, 69, 80, 72}; // (new)
     uint8_t CommandResponseByte; // (mainly for the radio ping command)
-    int8_t RSSI; // RSSI byte from radio, describes signal strength
+    float RSSI; // RSSI byte from radio, describes signal strength
     bool pyroMainDrogueFired   = false; // return status of pyro
     bool pyroBackupDrogueFired = false;
     bool pyroMainChuteFired    = false;
@@ -54,12 +55,14 @@ public:
     int8_t Update(telemetryData* GNDLocalData);
     void EStop();
     telemetryData GetRXData();
+    float getRSSI();
 
 private:
     config_e22_900t22s cfg;
     uint8_t TXBuf[512], RXBuf[2048];
     int16_t lastSeq = 0;
     bool e_stopped = false;
+    float RSSILocal = 0.0F;
 
     // RX data is data received from HAL (IMU, GPS, data from sensors, etc)
     telemetryData RX_Data = {};

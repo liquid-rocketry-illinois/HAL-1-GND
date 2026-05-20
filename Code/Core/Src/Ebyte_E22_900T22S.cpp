@@ -159,7 +159,7 @@ int8_t init_e22_900t22s(config_e22_900t22s *cfg)
         return 1; // ensure that the config set in module is the config given to it
 
     /* Raise MCU UART to match the E22's configured TRANS-mode baud rate. */
-    e22_cfg.huart->Init.BaudRate = 38400;
+    e22_cfg.huart->Init.BaudRate = 19200;
     HAL_UART_Init(e22_cfg.huart);
 
     /* return to normal transmit mode */
@@ -208,6 +208,19 @@ static int8_t uartRead(uint8_t *data, uint16_t len)
     return E22_OK;
 }
 
+/* ==================== GET RSSI ==================== */
+
+float getRSSIByte()
+{
+    uint8_t E22In[6] = {0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x01};
+    uint8_t raw[4] = {};
+
+    uartWrite(E22In, 6);
+    uartRead(raw, 4);
+
+    return raw[3];
+}
+
 /* ================= CONFIGURATION ================= */
 
 // save_to_flash overwrites the factory default settings.
@@ -224,8 +237,6 @@ int8_t writeConfig_e22_900t22s(
         COMMAND_BYTE_WRITE_CFG_NOSAVE_FLASH;
     frame[1] = 0x00;
     frame[2] = 0x07;
-
-    // REG3 is for more advanced functions and is not included
     frame[3] = cfg->ADDH;
     frame[4] = cfg->ADDL;
     frame[5] = cfg->NETID;
@@ -247,10 +258,10 @@ int8_t writeConfig_e22_900t22s(
         return E22_ERR_UART;
     }
 
-    /* Read the write echo. E22 responds with [C1][addr][len][data...], possibly
-     * preceded by a 0x00 preamble byte. Scan for the three header bytes rather
-     * than assuming a fixed offset. */
-    uint8_t _echo[11] = {0};
+    /* Read the write echo. E22 responds with [C1][addr][len][data...].
+     * Flush any stale preamble bytes before reading. */
+    __HAL_UART_FLUSH_DRREGISTER(e22_cfg.huart);
+    uint8_t _echo[10] = {0};
     uartRead(_echo, sizeof(_echo));
 
     bool echo_ok = false;
@@ -281,13 +292,16 @@ int8_t readConfig_e22_900t22s(config_e22_900t22s *cfg)
     cmd[0] = COMMAND_BYTE_READ_CFG;
     cmd[1] = 0x00; // Start from ADDH
     cmd[2] = 0x07; // Read all necessary registers
-    uint8_t resp[11] = {0};
+    uint8_t resp[10] = {0};
 
     //xSemaphoreTake(e22_mutex, portMAX_DELAY);
 
-    // Process mode switch in case aux pin logic is messed
-    HAL_Delay(200);
+    // Process mode switch cause aux pin needs some time
+    HAL_Delay(500);
     waitAux_e22_900t22s(1000); // wait until module is ready in CONFIG mode
+
+    // Flush any stale bytes (preamble zeros, prior echo leftovers) before read
+    __HAL_UART_FLUSH_DRREGISTER(e22_cfg.huart);
 
     uartWrite(cmd, 3);
     int8_t rslt = uartRead(resp, sizeof(resp));

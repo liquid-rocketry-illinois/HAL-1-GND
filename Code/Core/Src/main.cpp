@@ -78,12 +78,6 @@ uint32_t tick2 = HAL_GetTick();
 telemetryData LocalDataOffsets = {};
 
 extern "C" void Run() {
-    tusb_rhport_init_t dev_init = {
-        .role = TUSB_ROLE_DEVICE,
-        .speed = TUSB_SPEED_AUTO
-      };
-    tusb_init(BOARD_TUD_RHPORT, &dev_init);
-
     while (1) {
         // Make sure to call the tinyusb processing function so it can do its thing. This is why
         // nothing in the code can block
@@ -135,17 +129,13 @@ RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
     }
     switch (LocalGNDData.CommandResponseByte) {
         // Sensor and status issues start at 0 going up
-        case 0:
-            RCPDebug("All Nominal");
-        case 1:
-            RCPDebug("Radio Connection Issue!");
-        case 3:
-            RCPDebug("Servo tolerance Issue!");
-            // More codes may be added to account for other things
-
-            // HAL Response to ping from ground station
         case 100:
             RCPDebug("HAL acknowledged ping.");
+        case 1:
+            RCPDebug("Servo tolerance Issue!");
+        case 2:
+            RCPDebug("Vertical Axis Deviation!");
+            // More codes may be added to account for other things
 
             // Controls and CONOPs issues start at 255 going down
         case 255:
@@ -178,10 +168,9 @@ RCP_SimpleActuatorState RCP::simpleActuatorWrite_CLBK(uint8_t id, RCP_SimpleActu
             if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYROMAIN;
 
         // For writing to HAL, only the ABORT signal is needed. Everything else is handled automatically
-        // including the cmd-ack. Therefore case 3 for the last state isn't needed. Instead we'll use
-        // it for deflection testing
+        // including the cmd-ack. Case 3 is used to test deflection.
         case 3:
-            // Using 150 just because
+            // 150 is the command to test deflection
             if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.CommandByte = 150;
         default:
             HALOutboundData.pyroActivation = 0;
@@ -203,6 +192,7 @@ RCP::Floats4 RCP::readSensor(RCP_DeviceClass devclass, uint8_t id) {
 
         case RCP_DEVCLASS_ALTITUDE:
             floats.vals[0] = LocalGNDData.altitude;
+            floats.vals[1] = LocalGNDData.verticalVelocity;
             break;
 
         case RCP_DEVCLASS_GPS:
