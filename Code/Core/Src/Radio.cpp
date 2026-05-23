@@ -92,9 +92,29 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
     if (e22_initialized()) {
         uint32_t now = HAL_GetTick();
 
-        // Start a pulse before the blocking UART call so the pin goes HIGH
-        // at a known time. The RESET check runs immediately after receive
-        // returns, minimising the extra on-time caused by UART blocking.
+        // ---- 1. Drive CommandByte from the command queue ----
+        // Must happen before TransmitData so the correct byte goes out this cycle.
+        // BYTE_ABORT bypasses this entirely — TransmitData injects it when e_stopped.
+        if (_cmdRepeatRemaining > 0) {
+            _cmdRepeatRemaining--;
+        } else if (_cmdQCount > 0) {
+            HALOutboundData.CommandByte = _cmdQueue[_cmdQHead];
+            _cmdQHead = (_cmdQHead + 1) % CMD_QUEUE_DEPTH;
+            _cmdQCount--;
+            _cmdRepeatRemaining = CMD_TRANSMIT_REPEAT - 1; // already sending once now
+        } else {
+            HALOutboundData.CommandByte = BYTE_NO_CMD;
+        }
+
+        // ---- 2. Transmit to HAL first (GND is master, HAL is slave) ----
+        // HAL blocks waiting to receive before it will send telemetry back.
+        // If GND tries to receive before transmitting, both sides block on RX
+        // simultaneously, both time out, and no data flows that cycle.
+        TransmitData(HALOutboundData);
+
+        // ---- 3. Start buzzer pulse before the blocking RX call ----
+        // Pin goes HIGH at a known point; the RESET check runs right after
+        // ReceiveData() returns to minimise extra on-time from UART blocking.
         if (bzr_beep_ms != 0xFFFF && bzr_beep_ms != 0) {
             if (!bzr_pulsing && now - bzr_pulse_start >= bzr_period_ms) {
                 bzr_pulsing = true;
@@ -103,14 +123,17 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             }
         }
 
+        // ---- 4. Receive HAL's telemetry response ----
+        // HAL responds to any valid GND packet; being in RX mode immediately
+        // after our own TX ensures we catch the response in the same cycle.
+        // Round-trip at 9.6 kbps air rate ≈ 170 ms; RX timeout is 300 ms.
         int8_t rx_result = ReceiveData(RX_Data);
         now = HAL_GetTick(); // refresh after the blocking call
 
-        // accumulate stats for this 1-second window
+        // ---- 5. Buzzer stats — accumulate and recompute once per second ----
         bzr_total++;
         if (rx_result == 0) bzr_success++;
 
-        // recompute beep duration + period once per second
         if (now - bzr_window_start >= 1000u) {
             uint32_t succ_pct = bzr_total ? (bzr_success * 100u) / bzr_total : 0u;
             if      (succ_pct >  97u) { bzr_beep_ms = 0xFFFF; bzr_period_ms = 0;    }
@@ -123,7 +146,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             bzr_window_start = now;
         }
 
-        // drive buzzer — RESET check runs right after receive returns
+        // drive buzzer pin
         if (bzr_beep_ms == 0xFFFF) {
             HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_SET);
         } else if (bzr_beep_ms == 0) {
@@ -133,31 +156,11 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         }
 
+        // ---- 6. Non-blocking post-processing ----
         RSSILocal = getRSSIByte();
-
         Update_Local_Data();
 
-        // ---- Drive CommandByte from the command queue ----
-        // If we're still repeating the current active command, decrement the
-        // counter and leave CommandByte as-is (HALOutboundData holds it).
-        // Once repeats are exhausted, pop the next queued command (if any).
-        // BYTE_ABORT bypasses this path entirely — it is injected by
-        // TransmitData whenever e_stopped is true.
-        if (_cmdRepeatRemaining > 0) {
-            _cmdRepeatRemaining--;
-        } else if (_cmdQCount > 0) {
-            HALOutboundData.CommandByte = _cmdQueue[_cmdQHead];
-            _cmdQHead = (_cmdQHead + 1) % CMD_QUEUE_DEPTH;
-            _cmdQCount--;
-            _cmdRepeatRemaining = CMD_TRANSMIT_REPEAT - 1; // already sending once now
-        } else {
-            HALOutboundData.CommandByte = BYTE_NO_CMD;
-        }
-
-        // Transmit data with RCI/RCP processes
-        TransmitData(HALOutboundData);
-
-        // Now we can do the rest of RCP's stuff. We send the new RX data to be displayed by RCI.
+        // ---- 7. RCP data streaming ----
         static uint32_t timeLastLogged = HAL_GetTick();
 
         if(RCP::getDataStreaming() && HAL_GetTick() - timeLastLogged > 10) {
@@ -225,8 +228,8 @@ int8_t Radio::ReceiveData(telemetryData &dat) {
     if(len <= 0)                return E22_RECEIVE_ERR;
     if(len < 7)                 return E22_BAD_LENGTH;
 
-    int8_t status = decodeData(dat, (uint16_t)len);
-    if(status != 0)             return (uint8_t)status;
+    int8_t status = decodeData(dat, static_cast<uint16_t>(len));
+    if(status != 0)             return status;
     return 0;
 }
 
@@ -250,14 +253,15 @@ template<typename T>
 int8_t Radio::decodeData(T &payload, uint16_t buf_len)
 {
     if (buf_len < 7u) return -1; // too short to contain any valid frame
+    // buf_len >= 7 here, so buf_len - 1u >= 6u — no underflow risk.
 
     // Search only within the bytes we actually received.
     // Previously searched all TELEMETRY_MAX_PAYLOAD bytes, which allowed false
     // sync matches against stale buffer content from prior receives.
-    const uint16_t search_end = (buf_len < 2u) ? 0u : buf_len - 1u;
+    const int16_t search_end = static_cast<int16_t>(buf_len - 1u);
 
     int16_t sync_idx = -1;
-    for(int16_t i = 0; i < (int16_t)search_end; i++)
+    for(int16_t i = 0; i < search_end; i++)
     {
         if(RXBuf[i] == TELEMETRY_SYNC1 && RXBuf[i + 1] == TELEMETRY_SYNC2)
         {
