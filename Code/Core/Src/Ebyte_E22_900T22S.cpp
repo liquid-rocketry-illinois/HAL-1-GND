@@ -11,6 +11,11 @@ extern UART_HandleTypeDef huart1;
 static config_e22_900t22s e22_cfg;
 static bool initialized = false;
 
+// Last RSSI byte appended by the E22 hardware to a received packet.
+// Updated inside recieve_e22_900t22s() when R3_7_RSSI_BYTE_ENABLE is set.
+// Raw value; actual dBm = -(256 - raw) / 2 per E22 datasheet.
+static uint8_t rssi_last_rx = 0;
+
 /* ================= AUX HANDLING ================= */
 
 // Use aux to detect transmitted data via wireless, or if
@@ -158,9 +163,16 @@ int8_t init_e22_900t22s(config_e22_900t22s *cfg)
     if (!config_matches)
         return 1; // ensure that the config set in module is the config given to it
 
-    /* Raise MCU UART to match the E22's configured TRANS-mode baud rate. */
-    e22_cfg.huart->Init.BaudRate = 19200;
-    HAL_UART_Init(e22_cfg.huart);
+    /* Raise MCU UART to match the E22's configured TRANS-mode baud rate.
+     * Decode the baud from REG0 bits [7:5] rather than hardcoding so this
+     * stays correct if REG0 is changed without touching this line. */
+    {
+        static const uint32_t baud_table[] =
+            {1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
+        uint8_t baud_idx = (cfg->REG0 >> 5) & 0x07u;
+        e22_cfg.huart->Init.BaudRate = baud_table[baud_idx];
+        HAL_UART_Init(e22_cfg.huart);
+    }
 
     /* return to normal transmit mode */
     changeMode(TRANS);
@@ -210,15 +222,20 @@ static int8_t uartRead(uint8_t *data, uint16_t len)
 
 /* ==================== GET RSSI ==================== */
 
+// Returns the raw RSSI byte from the last successfully received packet.
+// Non-blocking — updated by recieve_e22_900t22s() each time a packet arrives.
+// Actual dBm = -(256 - raw) / 2.
+uint8_t get_rssi_e22_900t22s(void)
+{
+    return rssi_last_rx;
+}
+
+// Compatibility wrapper — kept so existing call sites don't break.
+// Previously sent a blocking UART config-query command in TRANS mode and
+// waited up to 5 s for a response that never came. Now non-blocking.
 float getRSSIByte()
 {
-    uint8_t E22In[6] = {0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x01};
-    uint8_t raw[4] = {};
-
-    uartWrite(E22In, 6);
-    uartRead(raw, 4);
-
-    return raw[3];
+    return (float)rssi_last_rx;
 }
 
 /* ================= CONFIGURATION ================= */
@@ -413,27 +430,33 @@ bool e22_available()
  */
 int16_t recieve_e22_900t22s(uint8_t *buffer, uint16_t expected_payload_len)
 {
-    const uint32_t baud     = e22_cfg.huart->Init.BaudRate;
-    const uint16_t total    = 5u + expected_payload_len + 2u;   // hdr + payload + CRC
+    const uint32_t baud  = e22_cfg.huart->Init.BaudRate;
+    const uint16_t total = 5u + expected_payload_len + 2u;  // hdr + payload + CRC
 
-    /* Time to clock out the full frame at the configured baud, plus 100 ms
-     * margin for the E22 to finish wireless decode before UART output begins. */
-    /* 300 ms margin: gives the remote side time to finish its own TX, process
-     * the received packet, and start sending a response before we time out.
-     * At 9600 bps air rate a 96-byte telemetry packet takes ~80 ms over RF,
-     * so the round-trip (GND TX → FC RX+process+TX → GND RX) is ~160 ms. */
-    uint32_t timeout_ms = ((total * 10u * 1000u) / baud) + 300u;
+    // When R3_7_RSSI_BYTE_ENABLE is set, the E22 appends one RSSI byte after
+    // the CRC over UART. We must consume it so it doesn't corrupt the next
+    // receive's sync search. It is stored in rssi_last_rx (non-blocking path).
+    const bool rssi_append = (e22_cfg.REG3 & R3_7_RSSI_BYTE_ENABLE) != 0u;
+    const uint16_t read_len = rssi_append ? total + 1u : total;
 
-    HAL_StatusTypeDef s = HAL_UART_Receive(e22_cfg.huart, buffer, total, timeout_ms);
+    /* 300 ms margin covers the round-trip latency at 9.6 kbps air rate:
+     *   GND TX (~24 ms) + E22 processing (~20 ms) + HAL TX (~127 ms) ≈ 171 ms.
+     * Timeout is tight so the main loop isn't stalled long when HAL is silent. */
+    uint32_t timeout_ms = ((read_len * 10u * 1000u) / baud) + 300u;
 
-    if (s == HAL_OK)
-        return (int16_t)total;
+    HAL_StatusTypeDef s = HAL_UART_Receive(e22_cfg.huart, buffer, read_len, timeout_ms);
+
+    if (s == HAL_OK) {
+        if (rssi_append) rssi_last_rx = buffer[total]; // extract appended RSSI byte
+        return (int16_t)total; // return only the packet bytes, not the RSSI byte
+    }
 
     if (s == HAL_TIMEOUT) {
-        uint16_t received = total - e22_cfg.huart->RxXferCount;
+        uint16_t received = read_len - e22_cfg.huart->RxXferCount;
+        if (rssi_append && received == read_len) rssi_last_rx = buffer[total];
         if (received < 7u)
-            return -2;   // not enough bytes for any valid packet
-        return (int16_t)received;
+            return -2;  // not enough bytes for any valid packet
+        return (int16_t)(received < total ? received : total);
     }
 
     /* HAL_ERROR or HAL_BUSY */

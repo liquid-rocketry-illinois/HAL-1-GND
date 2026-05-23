@@ -5,7 +5,10 @@
 #ifndef CODE_RADIO_DEFNS_H
 #define CODE_RADIO_DEFNS_H
 
-#define GND_RADIO_ADDRLOW 0x4A
+// GND's own radio address — must match what HAL has for GND_RADIO_ADDRLOW/HIGH
+// in its Telemetry.h (0x4A:0x4A), which is what HAL puts in the fixed-point
+// packet header when sending telemetry back to us.
+#define GND_RADIO_ADDRLOW  0x4A
 #define GND_RADIO_ADDRHIGH 0x4A
 
 // HAL-side syncing variables.
@@ -23,12 +26,26 @@
 #define E22_RECEIVE_ERR         3
 #define E22_BAD_LENGTH          4
 
-// CMD BYTES (chosen relatively arbitrarily)
-#define BYTE_ABORT 217
-#define BYTE_PING_RADIO 5
-#define BYTE_DEFLECT_TEST 12
-#define BYTE_PYRO_APOGEE 79
-#define BYTE_APOGEE_BKP 83
-#define BYTE_DROGUE 97
+// ===== CMD BYTES: GND → HAL =====
+// Values must match HAL-side definitions in Telemetry.h / constants.h.
+// Value 0 means "no command" (default/idle — HAL ignores it).
+
+#define BYTE_NO_CMD          0      // No command / idle
+#define BYTE_HANDSHAKE       0xA1u  // Ping: HAL responds with BYTE_HANDSHAKE_ACK
+#define BYTE_REQUEST_DATA    0xC3u  // Request a telemetry packet from HAL
+#define BYTE_DEFLECT_TEST    150    // Command HAL to run a fin/servo deflection test
+                                    //   (HAL: DEFLECT_TEST = 150 in Telemetry.h)
+#define BYTE_SERVO_TARE      0xD4u  // Tell HAL to apply servoOffset1/2 as new zero pts
+                                    //   (HAL: SERVO_OFFSET_CMD_BYTE = 0xD4)
+#define BYTE_ABORT           217    // E-Stop: HAL halts all active operations immediately
+                                    //   (HAL: SHUTDOWN_KEEPALIVE = 217)
+
+// ===== CMD RESPONSE BYTES: HAL → GND (CommandResponseByte) =====
+#define BYTE_HANDSHAKE_ACK   0xB2u  // HAL acknowledges BYTE_HANDSHAKE
+                                    //   (HAL: HANDSHAKE_FC_BYTE = 0xB2)
+
+// How many consecutive radio packets each command is repeated in.
+// Tuned against measured packet-error rate on this link (~9.6 kbps air rate).
+#define CMD_TRANSMIT_REPEAT  3
 
 #endif //CODE_RADIO_DEFNS_H

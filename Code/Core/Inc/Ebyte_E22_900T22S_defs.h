@@ -139,8 +139,11 @@ typedef enum {
 
 // REG3
 
-#define R3_7_RSSI_BYTE_ENABLE               0b0 << 7
-#define R3_7_RSSI_BYTE_DISABLE              0b1 << 7
+// E22 datasheet REG3 bit 7: 1 = append RSSI byte to UART output after each RX packet.
+// NOTE: these were previously inverted (ENABLE=0, DISABLE=0x80) which silently
+//       disabled the RSSI byte and caused getRSSIByte() to block for 5 s.
+#define R3_7_RSSI_BYTE_ENABLE               (0b1 << 7)
+#define R3_7_RSSI_BYTE_DISABLE              (0b0 << 7)
 #define R3_6_TRANSFER_METHOD_TRANSPARENT    0b0 << 6
 #define R3_6_TRANSFER_METHOD_FIXED_POINT    0b1 << 6
 #define R3_5_REPEATER_OFF                   0b0 << 5

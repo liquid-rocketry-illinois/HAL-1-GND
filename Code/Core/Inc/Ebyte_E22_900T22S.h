@@ -29,6 +29,12 @@ int16_t recieve_e22_900t22s(uint8_t *buffer, uint16_t expected_payload_len);
 inline volatile bool e22_data_ready = false;
 bool e22_available(void);
 
+// Returns the raw RSSI byte appended by the E22 to the last received packet.
+// Non-blocking. Updated by recieve_e22_900t22s() on each successful receive.
+// Actual dBm = -(256 - raw) / 2.
+uint8_t get_rssi_e22_900t22s(void);
+
+// Compatibility wrapper around get_rssi_e22_900t22s(). Non-blocking.
 float getRSSIByte();
 
 // Switch from trans, WOR, config, and off modes

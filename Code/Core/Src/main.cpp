@@ -12,6 +12,7 @@
 #include "main.h"
 
 #include "Radio.h"
+#include "RADIO_DEFNS.h"
 #include "RCP_Target.h"
 #include "tusb.h"
 
@@ -25,6 +26,20 @@ extern "C" void Init() {
 
     // Init tinyusb
     bool tusbstate = tud_rhport_init(BOARD_TUD_RHPORT, &TUSB_INIT_DATA);
+
+    // DEBUG
+    // char buffer[] = "hello world!";
+    // uint32_t time = 0;
+    // while (1)
+    // {
+    //     tud_task_ext(1, 0);
+    //     if (HAL_GetTick() - time > 1000)
+    //     {
+    //         time = HAL_GetTick();
+    //         tud_cdc_write(buffer, sizeof(buffer));
+    //         tud_cdc_write_flush();
+    //     }
+    // }
 
     // Wait for the DCR line to go high (set by RCI)
     while(!(tud_cdc_get_line_state() & 0x01)) {
@@ -96,7 +111,15 @@ extern "C" void Run() {
 
         // Update both parts.
         RCP::yield();
+        RCP::runTest();
         int8_t status = mainDev.Update(&LocalGNDData);
+
+        if (HAL_GetTick() - tick1 > 1000)
+        {
+            tick1 = HAL_GetTick();
+            RCPDebug("ping");
+        }
+
     }
 }
 
@@ -128,31 +151,43 @@ RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
             ;
     }
     switch (LocalGNDData.CommandResponseByte) {
-        // Sensor and status issues start at 0 going up
-        case 100:
-            RCPDebug("HAL acknowledged ping.");
+        // BYTE_HANDSHAKE_ACK (0xB2 = 178): HAL acknowledged our BYTE_HANDSHAKE ping.
+        case BYTE_HANDSHAKE_ACK:
+            RCPDebug("HAL acknowledged handshake/ping.");
+            break;
+        // 0: HAL default / no command active
+        case 0:
+            RCPDebug("No connection or invalid command!");
+            break;
+        // Sensor and status issue codes (HAL-defined, counting up from 1)
         case 1:
             RCPDebug("Servo tolerance Issue!");
+            break;
         case 2:
             RCPDebug("Vertical Axis Deviation!");
-            // More codes may be added to account for other things
-
-            // Controls and CONOPs issues start at 255 going down
+            break;
+        // Controls / CONOPs event codes (HAL-defined, counting down from 255)
         case 255:
             RCPDebug("Main Drogue Triggered");
+            break;
         case 254:
             RCPDebug("Backup Drogue Triggered");
+            break;
         case 253:
             RCPDebug("Main Chute Triggered");
+            break;
         case 252:
             RCPDebug("Burnout. Starting Roll-CTRL");
+            break;
         case 251:
             RCPDebug("Roll CTRL Deactivated!");
+            break;
         case 250:
             RCPDebug("WARNING Horizontal drift notable!");
-
+            break;
         default:
             RCPDebug("Unknown Command Response!");
+            break;
     }
 
     return RCP_SIMPLE_ACTUATOR_OFF;
@@ -160,21 +195,26 @@ RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
 
 RCP_SimpleActuatorState RCP::simpleActuatorWrite_CLBK(uint8_t id, RCP_SimpleActuatorState state) {
     switch (id) {
-        case 0:
+        case 0: // Drogue main pyro
             if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYRODROGUEMAIN;
-        case 1:
+            break;
+        case 1: // Drogue backup pyro
             if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYRODROGUEBKP;
-        case 2:
+            break;
+        case 2: // Main chute pyro
             if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYROMAIN;
+            break;
 
-        // For writing to HAL, only the ABORT signal is needed. Everything else is handled automatically
-        // including the cmd-ack. Case 3 is used to test deflection.
+        // Case 3: fin/servo deflection test — enqueue command rather than writing
+        // directly to CommandByte so the queue can guarantee repeated delivery.
         case 3:
-            // 150 is the command to test deflection
-            if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.CommandByte = 150;
+            if (state == RCP_SIMPLE_ACTUATOR_ON) mainDev.enqueueCommand(BYTE_DEFLECT_TEST);
+            break;
+
         default:
+            // Unknown actuator id; clear any pending pyro key for safety.
             HALOutboundData.pyroActivation = 0;
-            HALOutboundData.CommandByte = 0;
+            break;
     }
     return RCP_SIMPLE_ACTUATOR_OFF;
 }
@@ -221,7 +261,7 @@ RCP::Floats4 RCP::readSensor(RCP_DeviceClass devclass, uint8_t id) {
             break;
 
         case RCP_DEVCLASS_RADIO_STRENGTH:
-            floats.vals[0] = LocalGNDData.RSSI;
+            floats.vals[0] = (float)LocalGNDData.RSSI; // int8_t → float; dBm = -(256-raw)/2
             break;
 
         case RCP_DEVCLASS_TEMPERATURE:
@@ -244,6 +284,9 @@ void RCP::writeSensorTare(RCP_DeviceClass devclass, uint8_t id, [[maybe_unused]]
         case RCP_DEVCLASS_ANGLED_ACTUATOR:
             if (id == 0) HALOutboundData.servoOffset1 = tareVal;
             if (id == 1) HALOutboundData.servoOffset2 = tareVal;
+            // Enqueue so HAL is guaranteed to receive the tare command
+            // alongside the new offset values in the payload.
+            mainDev.enqueueCommand(BYTE_SERVO_TARE);
             break;
 
             // NOTE: accelerometer and gyroscope are not zeroed. we need what the sensor detects

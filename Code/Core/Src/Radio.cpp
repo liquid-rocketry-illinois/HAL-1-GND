@@ -47,7 +47,7 @@ int8_t Radio::Init() {
 
     des_cfg.REG0 =   R0_765_E22_UART_BAUD::E22_UART_BAUD_38400
                    | R0_43_SERIAL_PORT_PARITY_BIT::MODE_8N1
-                   | R0_210_E22_AIR_DATA_RATE::E22_AIR_RATE_2_4K;
+                   | R0_210_E22_AIR_DATA_RATE::E22_AIR_RATE_9_6K; // must match HAL (Telemetry.cpp)
 
     des_cfg.REG1 =   R1_76_SUB_PACKET_SETTING::BYTES_240
                    | R1_5_RSSI_ENVIRONMENTAL_NOISE_MEASURE_DISABLE
@@ -136,6 +136,24 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
         RSSILocal = getRSSIByte();
 
         Update_Local_Data();
+
+        // ---- Drive CommandByte from the command queue ----
+        // If we're still repeating the current active command, decrement the
+        // counter and leave CommandByte as-is (HALOutboundData holds it).
+        // Once repeats are exhausted, pop the next queued command (if any).
+        // BYTE_ABORT bypasses this path entirely — it is injected by
+        // TransmitData whenever e_stopped is true.
+        if (_cmdRepeatRemaining > 0) {
+            _cmdRepeatRemaining--;
+        } else if (_cmdQCount > 0) {
+            HALOutboundData.CommandByte = _cmdQueue[_cmdQHead];
+            _cmdQHead = (_cmdQHead + 1) % CMD_QUEUE_DEPTH;
+            _cmdQCount--;
+            _cmdRepeatRemaining = CMD_TRANSMIT_REPEAT - 1; // already sending once now
+        } else {
+            HALOutboundData.CommandByte = BYTE_NO_CMD;
+        }
+
         // Transmit data with RCI/RCP processes
         TransmitData(HALOutboundData);
 
@@ -164,7 +182,9 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             RCP::sendTwoFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 0,
                         {RX_Data.servoPos1, RX_Data.servoPos2});
 
-            RCP::sendTwoFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, {RX_Data.RSSI, RSSILocal});
+            // RX_Data.RSSI is int8_t (raw E22 byte); cast to float for RCP streaming.
+            // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet).
+            RCP::sendTwoFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, {(float)RX_Data.RSSI, RSSILocal});
 
             // pyros in order of trigger
             RCP::forceSendSimpleActuatorState(0);
@@ -181,7 +201,20 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
 }
 
 void Radio::EStop() {
+    RCPDebug("ESTOP!");
     e_stopped = true;
+}
+
+bool Radio::enqueueCommand(uint8_t cmd) {
+    if (_cmdQCount >= CMD_QUEUE_DEPTH)
+    {
+        RCPDebug("Command failed, queue full!");
+        return false;
+    }// queue full — caller should handle
+    _cmdQueue[_cmdQTail] = cmd;
+    _cmdQTail = (_cmdQTail + 1) % CMD_QUEUE_DEPTH;
+    _cmdQCount++;
+    return true;
 }
 
 
@@ -192,30 +225,39 @@ int8_t Radio::ReceiveData(telemetryData &dat) {
     if(len <= 0)                return E22_RECEIVE_ERR;
     if(len < 7)                 return E22_BAD_LENGTH;
 
-    int8_t status = decodeData(dat);
+    int8_t status = decodeData(dat, (uint16_t)len);
     if(status != 0)             return (uint8_t)status;
     return 0;
 }
 
-int8_t Radio::TransmitData(const GndStationData &dat) {
+int8_t Radio::TransmitData(GndStationData &dat) {
     if(e_stopped) {
-        GndStationData abortDat = dat;
-        abortDat.CommandByte = BYTE_ABORT;
-        encodeAndSend(abortDat);
-    } else {
-        encodeAndSend(dat);
+        // Override CommandByte with BYTE_ABORT unconditionally.
+        // The queue is bypassed once EStop() fires; BYTE_ABORT will be sent
+        // on every subsequent Update() cycle for as long as the MCU runs,
+        // which gives HAL the best chance of receiving it despite packet loss.
+        dat.CommandByte = BYTE_ABORT;
+        RCPDebug("Transmitting Abort Signal");
     }
+    encodeAndSend(dat);
     return 0;
 }
 
-// template decode function that works for any data struct
-// expect payload to be of gndstation data or toHAL data
+// Decode a received frame from RXBuf.
+// buf_len is the number of bytes actually received (from recieve_e22_900t22s),
+// so the sync search is bounded to valid data and cannot match stale buffer bytes.
 template<typename T>
-int8_t Radio::decodeData(T &payload)
+int8_t Radio::decodeData(T &payload, uint16_t buf_len)
 {
-    // search for SYNC1 followed by SYNC2
+    if (buf_len < 7u) return -1; // too short to contain any valid frame
+
+    // Search only within the bytes we actually received.
+    // Previously searched all TELEMETRY_MAX_PAYLOAD bytes, which allowed false
+    // sync matches against stale buffer content from prior receives.
+    const uint16_t search_end = (buf_len < 2u) ? 0u : buf_len - 1u;
+
     int16_t sync_idx = -1;
-    for(int16_t i = 0; i < (int16_t)(TELEMETRY_MAX_PAYLOAD - 1); i++)
+    for(int16_t i = 0; i < (int16_t)search_end; i++)
     {
         if(RXBuf[i] == TELEMETRY_SYNC1 && RXBuf[i + 1] == TELEMETRY_SYNC2)
         {
@@ -225,21 +267,20 @@ int8_t Radio::decodeData(T &payload)
     }
 
     if(sync_idx == -1)
-        return -1;  // sync bytes not found anywhere in buffer
+        return -1;  // sync bytes not found in received data
 
-    // ensure enough bytes remain after sync for the full header
-    // [SYNC1][SYNC2][len][seq_lo][seq_hi] = 5 bytes minimum before payload
-    if((sync_idx + 5) >= TELEMETRY_MAX_PAYLOAD)
-        return -2;  // not enough room for header after sync
+    // Enough bytes after sync for the full 5-byte header?
+    // [SYNC1][SYNC2][len][seq_lo][seq_hi] = 5 bytes before payload starts.
+    if((uint16_t)(sync_idx + 5) >= buf_len)
+        return -2;
 
     uint8_t payload_len = RXBuf[sync_idx + 2];
 
     if(payload_len != sizeof(T))
-        return -3;
+        return -3;  // length mismatch — wrong packet type or struct size skew
 
-    // ensure full packet fits in buffer
-    // sync_idx + 5 header bytes + payload + 2 crc bytes
-    if((sync_idx + 5 + payload_len + 2) > TELEMETRY_MAX_PAYLOAD)
+    // Full packet (header + payload + CRC) must fit inside received bytes.
+    if((uint16_t)(sync_idx + 5 + payload_len + 2) > buf_len)
         return -4;
 
     uint16_t seq_rx = RXBuf[sync_idx + 3] | (RXBuf[sync_idx + 4] << 8);
