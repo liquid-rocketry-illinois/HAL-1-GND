@@ -50,7 +50,7 @@ int8_t Radio::Init() {
                    | R0_210_E22_AIR_DATA_RATE::E22_AIR_RATE_9_6K; // must match HAL (Telemetry.cpp)
 
     des_cfg.REG1 =   R1_76_SUB_PACKET_SETTING::BYTES_240
-                   | R1_5_RSSI_ENVIRONMENTAL_NOISE_MEASURE_DISABLE
+                   | R1_5_RSSI_ENVIRONMENTAL_NOISE_MEASURE_ENABLE
                    | R1_2_SOFTWARE_MODE_SWITCHING_OFF
                    | R1_10_E22_TX_POWER::E22_TX_POWER_22DBM;
 
