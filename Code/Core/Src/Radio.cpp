@@ -224,6 +224,7 @@ bool Radio::enqueueCommand(uint8_t cmd) {
 // ======================= PRIVATE FUNCS ===========================
 
 int8_t Radio::ReceiveData(telemetryData &dat) {
+    // +2 for the trailing SYNC2/SYNC1 pair appended by the sender after CRC.
     int16_t len = recieve_e22_900t22s(RXBuf, sizeof(telemetryData));
     if(len <= 0)                return E22_RECEIVE_ERR;
     if(len < 7)                 return E22_BAD_LENGTH;
@@ -283,8 +284,10 @@ int8_t Radio::decodeData(T &payload, uint16_t buf_len)
     if(payload_len != sizeof(T))
         return -3;  // length mismatch — wrong packet type or struct size skew
 
-    // Full packet (header + payload + CRC) must fit inside received bytes.
-    if((uint16_t)(sync_idx + 5 + payload_len + 2) > buf_len)
+    // Full packet (header + payload + CRC + trailing sync pair) must fit inside received bytes.
+    // Layout after sync_idx: [S1][S2][len][seq_lo][seq_hi][payload x N][CRC_lo][CRC_hi][S2][S1]
+    //                          0   1   2    3       4       5..4+N      5+N     6+N     7+N  8+N
+    if((uint16_t)(sync_idx + 5 + payload_len + 4) > buf_len)
         return -4;
 
     uint16_t seq_rx = RXBuf[sync_idx + 3] | (RXBuf[sync_idx + 4] << 8);
@@ -297,6 +300,11 @@ int8_t Radio::decodeData(T &payload, uint16_t buf_len)
 
     if(crc_rx != crc_calc)
         return -5;
+
+    // Verify trailing sync bytes (mirror of header: SYNC2 then SYNC1)
+    if(RXBuf[sync_idx + 7 + payload_len] != TELEMETRY_SYNC2 ||
+       RXBuf[sync_idx + 8 + payload_len] != TELEMETRY_SYNC1)
+        return -6;  // trailing sync mismatch — frame boundary corrupted
 
     memcpy(&payload, &RXBuf[sync_idx + 5], sizeof(T));
 
@@ -329,9 +337,12 @@ uint8_t Radio::encodeAndSend(const T &payload)
     uint16_t crc = Checksum(&TXBuf[3], 5 + payload_len);  // start at SYNC1
     TXBuf[8 + payload_len] = crc & 0xFF;
     TXBuf[9 + payload_len] = (crc >> 8) & 0xFF;
+    TXBuf[10 + payload_len] = TELEMETRY_SYNC2;
+    TXBuf[11 + payload_len] = TELEMETRY_SYNC1;
 
     // Not using transmit_fixed
-    int8_t status = transmit_e22_900t22s(TXBuf, 10 + payload_len);
+    // +12: 3 routing bytes + SYNC1 + SYNC2 + len + seq_lo + seq_hi (8) + CRC_lo + CRC_hi + trailing SYNC2 + trailing SYNC1 (4)
+    int8_t status = transmit_e22_900t22s(TXBuf, 12 + payload_len);
     if(status != E22_OK)
         return status;
 

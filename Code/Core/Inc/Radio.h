@@ -78,7 +78,7 @@ public:
 
 private:
     config_e22_900t22s cfg;
-    uint8_t TXBuf[512], RXBuf[2048];
+    uint8_t TXBuf[240], RXBuf[240];
     int16_t lastSeq = 0;
     bool e_stopped = false;
     float RSSILocal = 0.0F;
