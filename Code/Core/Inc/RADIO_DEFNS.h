@@ -44,8 +44,9 @@
 #define BYTE_HANDSHAKE_ACK   0xB2u  // HAL acknowledges BYTE_HANDSHAKE
                                     //   (HAL: HANDSHAKE_FC_BYTE = 0xB2)
 
-// How many consecutive radio packets each command is repeated in.
-// Tuned against measured packet-error rate on this link (~9.6 kbps air rate).
-#define CMD_TRANSMIT_REPEAT  3
+// Commands are now ACK-based: GND retransmits each command every Update() cycle
+// until HAL echoes it back in CommandResponseByte, or a 5-second timeout fires.
+// CMD_TRANSMIT_REPEAT is no longer used.
+#define CMD_ACK_TIMEOUT_MS  5000u
 
 #endif //CODE_RADIO_DEFNS_H

@@ -200,7 +200,7 @@ static int8_t uartWrite(uint8_t *data, uint16_t len)
         &huart1,
         data,
         len,
-        5000) != HAL_OK)
+        500) != HAL_OK)
         return E22_ERR_UART;
 
     return E22_OK;
@@ -212,7 +212,7 @@ static int8_t uartRead(uint8_t *data, uint16_t len)
         &huart1, // e22_cfg.huart,
         data,
         len,
-        5000); // Make a generous amount of time
+        500);
 
     while (!auxHigh()) {} // wait for read to finish in case
     if(status != HAL_OK) return E22_ERR_UART;
@@ -222,20 +222,39 @@ static int8_t uartRead(uint8_t *data, uint16_t len)
 
 /* ==================== GET RSSI ==================== */
 
-// Returns the raw RSSI byte from the last successfully received packet.
-// Non-blocking — updated by recieve_e22_900t22s() each time a packet arrives.
-// Actual dBm = -(256 - raw) / 2.
-uint8_t get_rssi_e22_900t22s(void)
-{
-    return rssi_last_rx;
-}
-
-// Compatibility wrapper — kept so existing call sites don't break.
-// Previously sent a blocking UART config-query command in TRANS mode and
-// waited up to 5 s for a response that never came. Now non-blocking.
+// Send command to e22 in transmission mode
 float getRSSIByte()
 {
-    return (float)rssi_last_rx;
+    // only callable in trans or WOR mode
+    if ((HAL_GPIO_ReadPin(RADIO_M0_GPIO_Port, RADIO_M0_Pin) == GPIO_PIN_RESET &&
+        HAL_GPIO_ReadPin(RADIO_M1_GPIO_Port, RADIO_M1_Pin) == GPIO_PIN_RESET) ||
+        (HAL_GPIO_ReadPin(RADIO_M0_GPIO_Port, RADIO_M0_Pin) == GPIO_PIN_SET &&
+        HAL_GPIO_ReadPin(RADIO_M1_GPIO_Port, RADIO_M1_Pin) == GPIO_PIN_RESET))
+    {
+        static uint8_t RSSISend[6] = {0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x02};
+        uint8_t RSSIReceive[5] = {};
+
+        // Flush any stale bytes (preamble zeros, prior echo leftovers) before read
+        __HAL_UART_FLUSH_DRREGISTER(e22_cfg.huart);
+
+        waitAux_e22_900t22s(300);
+        uartWrite(RSSISend, 6);
+        uartRead(RSSIReceive, 5);
+
+        // all bytes OK
+        if (RSSIReceive[0] == 0xC1 && RSSIReceive[1] == 0x00 && RSSIReceive[2] == 0x02)
+        {
+            // byte 3 is the current RSSI which doesn't have purpose for the FC. We want
+            // the RSSI of the signal
+            rssi_last_rx = RSSIReceive[4];
+            return static_cast<float>(rssi_last_rx) / -2.0F;
+        }
+
+        return 0;
+    }
+
+    // Wrong mode
+    return -1.0F;
 }
 
 /* ================= CONFIGURATION ================= */
@@ -268,6 +287,9 @@ int8_t writeConfig_e22_900t22s(
     HAL_Delay(400);
 
     // Construct and write config commands
+    // Flush any stale preamble bytes before reading.
+    __HAL_UART_FLUSH_DRREGISTER(e22_cfg.huart);
+    uint8_t _echo[10] = {0};
 
     if(uartWrite(frame, 10) != E22_OK)
     {
@@ -275,10 +297,7 @@ int8_t writeConfig_e22_900t22s(
         return E22_ERR_UART;
     }
 
-    /* Read the write echo. E22 responds with [C1][addr][len][data...].
-     * Flush any stale preamble bytes before reading. */
-    __HAL_UART_FLUSH_DRREGISTER(e22_cfg.huart);
-    uint8_t _echo[10] = {0};
+    // Read the write echo. E22 responds with [C1][addr][len][data...].
     uartRead(_echo, sizeof(_echo));
 
     bool echo_ok = false;
@@ -430,37 +449,17 @@ bool e22_available()
  */
 int16_t recieve_e22_900t22s(uint8_t *buffer, uint16_t expected_payload_len)
 {
-    const uint32_t baud  = e22_cfg.huart->Init.BaudRate;
-    const uint16_t total = 5u + expected_payload_len + 2u;  // hdr + payload + CRC
+    const uint16_t total    = 5u + expected_payload_len + 2u;   // hdr + payload + CRC
 
-    // When R3_7_RSSI_BYTE_ENABLE is set, the E22 appends one RSSI byte after
-    // the CRC over UART. We must consume it so it doesn't corrupt the next
-    // receive's sync search. It is stored in rssi_last_rx (non-blocking path).
-    const bool rssi_append = (e22_cfg.REG3 & R3_7_RSSI_BYTE_ENABLE) != 0u;
-    const uint16_t read_len = rssi_append ? total + 1u : total;
+    int8_t s = uartRead(buffer, total);
 
-    /* 300 ms margin covers the round-trip latency at 9.6 kbps air rate:
-     *   GND TX (~24 ms) + E22 processing (~20 ms) + HAL TX (~127 ms) ≈ 171 ms.
-     * Timeout is tight so the main loop isn't stalled long when HAL is silent. */
-    uint32_t timeout_ms = ((read_len * 10u * 1000u) / baud) + 300u;
+    if (s == E22_OK)
+        return (int16_t)total;
 
-    HAL_StatusTypeDef s = HAL_UART_Receive(e22_cfg.huart, buffer, read_len, timeout_ms);
-
-    if (s == HAL_OK) {
-        if (rssi_append) rssi_last_rx = buffer[total]; // extract appended RSSI byte
-        return (int16_t)total; // return only the packet bytes, not the RSSI byte
-    }
-
-    if (s == HAL_TIMEOUT) {
-        uint16_t received = read_len - e22_cfg.huart->RxXferCount;
-        if (rssi_append && received == read_len) rssi_last_rx = buffer[total];
-        if (received < 7u)
-            return -2;  // not enough bytes for any valid packet
-        return (int16_t)(received < total ? received : total);
-    }
-
-    /* HAL_ERROR or HAL_BUSY */
-    return -1;
+    uint16_t received = total - e22_cfg.huart->RxXferCount;
+    if (received < 7u)
+        return -2;   // not enough bytes for any valid packet
+    return (int16_t)received;
 }
 
 /* ================= ADDRESS ================= */

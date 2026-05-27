@@ -92,29 +92,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
     if (e22_initialized()) {
         uint32_t now = HAL_GetTick();
 
-        // ---- 1. Drive CommandByte from the command queue ----
-        // Must happen before TransmitData so the correct byte goes out this cycle.
-        // BYTE_ABORT bypasses this entirely — TransmitData injects it when e_stopped.
-        if (_cmdRepeatRemaining > 0) {
-            _cmdRepeatRemaining--;
-        } else if (_cmdQCount > 0) {
-            HALOutboundData.CommandByte = _cmdQueue[_cmdQHead];
-            _cmdQHead = (_cmdQHead + 1) % CMD_QUEUE_DEPTH;
-            _cmdQCount--;
-            _cmdRepeatRemaining = CMD_TRANSMIT_REPEAT - 1; // already sending once now
-        } else {
-            HALOutboundData.CommandByte = BYTE_NO_CMD;
-        }
-
-        // ---- 2. Transmit to HAL first (GND is master, HAL is slave) ----
-        // HAL blocks waiting to receive before it will send telemetry back.
-        // If GND tries to receive before transmitting, both sides block on RX
-        // simultaneously, both time out, and no data flows that cycle.
-        TransmitData(HALOutboundData);
-
-        // ---- 3. Start buzzer pulse before the blocking RX call ----
-        // Pin goes HIGH at a known point; the RESET check runs right after
-        // ReceiveData() returns to minimise extra on-time from UART blocking.
+        // Allow buzzer to signal to end user
         if (bzr_beep_ms != 0xFFFF && bzr_beep_ms != 0) {
             if (!bzr_pulsing && now - bzr_pulse_start >= bzr_period_ms) {
                 bzr_pulsing = true;
@@ -123,14 +101,55 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             }
         }
 
-        // ---- 4. Receive HAL's telemetry response ----
-        // HAL responds to any valid GND packet; being in RX mode immediately
-        // after our own TX ensures we catch the response in the same cycle.
-        // Round-trip at 9.6 kbps air rate ≈ 170 ms; RX timeout is 300 ms.
+        // GND primarily acts as a receiver; receive first so that HAL's ACK byte
+        // is visible before the transmit decision is made this cycle.
         int8_t rx_result = ReceiveData(RX_Data);
-        now = HAL_GetTick(); // refresh after the blocking call
+        now = HAL_GetTick(); // refresh tick after the blocking receive
 
-        // ---- 5. Buzzer stats — accumulate and recompute once per second ----
+        // --- ACK-based command management ---
+        // An active command is retransmitted every cycle until HAL acknowledges
+        // it (CommandResponseByte == sent command) or 5 s elapse (timeout).
+        if (_activeCmdPending) {
+            const bool acked   = (rx_result == 0 &&
+                                  RX_Data.CommandResponseByte == _activeCmd);
+            const bool timeout = (now - _activeCmdStartTick >= 5000u);
+            if (acked || timeout) {
+                if (acked)   RCPDebug("Cmd ACK received");
+                if (timeout) RCPDebug("Cmd TX timed out (5 s)");
+                _activeCmdPending = false;
+                _activeCmd        = BYTE_NO_CMD;
+            }
+        }
+
+        // Dequeue next command if the slot is now free
+        if (!_activeCmdPending && _cmdQCount > 0) {
+            _activeCmd           = _cmdQueue[_cmdQHead];
+            _cmdQHead            = (_cmdQHead + 1) % CMD_QUEUE_DEPTH;
+            _cmdQCount--;
+            _activeCmdPending    = true;
+            _activeCmdStartTick  = now;
+        }
+
+        // Drive CommandByte from the active command; idle when nothing is pending.
+        HALOutboundData.CommandByte = _activeCmdPending ? _activeCmd : BYTE_NO_CMD;
+
+        // Transmit only when GND has something new to say:
+        //   • an active command waiting for ACK, OR
+        //   • a non-command data field has changed since the last successful TX.
+        // Otherwise GND stays silent and lets FC transmit telemetry uninterrupted.
+        const bool needsTransmit =
+            _activeCmdPending                                               ||
+            (HALOutboundData.servoOffset1   != _lastSentData.servoOffset1)  ||
+            (HALOutboundData.servoOffset2   != _lastSentData.servoOffset2)  ||
+            (HALOutboundData.pyroActivation != _lastSentData.pyroActivation);
+
+        if (needsTransmit)
+        {
+            TransmitData(HALOutboundData);
+            _lastSentData = HALOutboundData;
+        }
+
+        now = HAL_GetTick(); // refresh after the blocking transmit
         bzr_total++;
         if (rx_result == 0) bzr_success++;
 
@@ -156,7 +175,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         }
 
-        // ---- 6. Non-blocking post-processing ----
+        // post-processing
         RSSILocal = getRSSIByte();
         Update_Local_Data();
 
@@ -256,13 +275,8 @@ int8_t Radio::decodeData(T &payload, uint16_t buf_len)
     if (buf_len < 7u) return -1; // too short to contain any valid frame
     // buf_len >= 7 here, so buf_len - 1u >= 6u — no underflow risk.
 
-    // Search only within the bytes we actually received.
-    // Previously searched all TELEMETRY_MAX_PAYLOAD bytes, which allowed false
-    // sync matches against stale buffer content from prior receives.
-    const int16_t search_end = static_cast<int16_t>(buf_len - 1u);
-
     int16_t sync_idx = -1;
-    for(int16_t i = 0; i < search_end; i++)
+    for(int16_t i = 0; i < buf_len; i++)
     {
         if(RXBuf[i] == TELEMETRY_SYNC1 && RXBuf[i + 1] == TELEMETRY_SYNC2)
         {
@@ -322,10 +336,9 @@ uint8_t Radio::encodeAndSend(const T &payload)
     // fixed mode header — module strips these before delivering to receiver
     TXBuf[0] = HAL1_RADIO_ADDRHIGH;
     TXBuf[1] = HAL1_RADIO_ADDRLOW;
-
     TXBuf[2] = CH915;
 
-    // your packet starts at offset 3
+    // What is actually transmitted
     TXBuf[3] = TELEMETRY_SYNC1;
     TXBuf[4] = TELEMETRY_SYNC2;
     TXBuf[5] = payload_len;

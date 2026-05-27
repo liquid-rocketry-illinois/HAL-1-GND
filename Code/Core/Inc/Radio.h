@@ -99,7 +99,16 @@ private:
     uint8_t _cmdQHead  = 0;
     uint8_t _cmdQTail  = 0;
     uint8_t _cmdQCount = 0;
-    uint8_t _cmdRepeatRemaining = 0; // how many more TX cycles for the active cmd
+    // ACK-based command state.
+    // A command is dequeued once, sent every Update() cycle, and held until
+    // HAL echoes it back in CommandResponseByte (ACK) or 5 s elapse (timeout).
+    uint8_t  _activeCmd          = BYTE_NO_CMD;
+    bool     _activeCmdPending   = false;
+    uint32_t _activeCmdStartTick = 0;
+
+    // Snapshot of the last successfully transmitted outbound packet.
+    // Used to suppress redundant transmissions when nothing has changed.
+    GndStationData _lastSentData = {};
 
     int8_t ReceiveData(telemetryData &gnd);
     int8_t TransmitData(GndStationData &data);
