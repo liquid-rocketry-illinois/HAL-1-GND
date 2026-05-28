@@ -40,9 +40,6 @@ typedef struct
     float temperature; // use averaged temperatures from BMP390L and BMI323 TMR
     uint8_t callsign[12] = {75, 69, 57, 69, 82, 73, 95, 65, 76, 69, 80, 72}; // (new)
     uint8_t CommandResponseByte; // (mainly for the radio ping command)
-    // @attention Must be int8_t to match HAL's telemetryData (Telemetry.h).
-    // HAL stores the raw E22 RSSI byte here; convert with: dBm = -(256 - raw) / 2.
-    // Using float here causes a 3-byte struct size difference that breaks decoding.
     int8_t RSSI;
     bool pyroMainDrogueFired   = false; // return status of pyro
     bool pyroBackupDrogueFired = false;

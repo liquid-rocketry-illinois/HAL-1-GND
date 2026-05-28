@@ -114,11 +114,11 @@ extern "C" void Run() {
         RCP::runTest();
         int8_t status = mainDev.Update(&LocalGNDData);
 
-        if (HAL_GetTick() - tick1 > 1000)
-        {
-            tick1 = HAL_GetTick();
-            RCPDebug("ping");
-        }
+        // if (HAL_GetTick() - tick1 > 1000)
+        // {
+        //     tick1 = HAL_GetTick();
+        //     RCPDebug("ping");
+        // }
 
     }
 }
@@ -186,7 +186,6 @@ RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
             RCPDebug("WARNING Horizontal drift notable!");
             break;
         default:
-            RCPDebug("Unknown Command Response!");
             break;
     }
 

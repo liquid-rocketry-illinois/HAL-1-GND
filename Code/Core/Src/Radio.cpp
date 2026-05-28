@@ -151,7 +151,10 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
 
         now = HAL_GetTick(); // refresh after the blocking transmit
         bzr_total++;
-        if (rx_result == 0) bzr_success++;
+        if (rx_result < -2) {
+            bzr_success++;
+            RCPDebug("Incoming packet detected!"); // notify that a packet containing sync bytes have been detected
+        }
 
         if (now - bzr_window_start >= 1000u) {
             uint32_t succ_pct = bzr_total ? (bzr_success * 100u) / bzr_total : 0u;
@@ -206,7 +209,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
 
             // RX_Data.RSSI is int8_t (raw E22 byte); cast to float for RCP streaming.
             // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet).
-            RCP::sendTwoFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, {(float)RX_Data.RSSI, RSSILocal});
+            RCP::sendTwoFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, {RSSILocal, (float)RX_Data.RSSI});
 
             // pyros in order of trigger
             RCP::forceSendSimpleActuatorState(0);
@@ -243,6 +246,8 @@ bool Radio::enqueueCommand(uint8_t cmd) {
 // ======================= PRIVATE FUNCS ===========================
 
 int8_t Radio::ReceiveData(telemetryData &dat) {
+    memset(&RXBuf, 0, sizeof(RXBuf));
+
     // +2 for the trailing SYNC2/SYNC1 pair appended by the sender after CRC.
     int16_t len = recieve_e22_900t22s(RXBuf, sizeof(telemetryData));
     if(len <= 0)                return E22_RECEIVE_ERR;
