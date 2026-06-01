@@ -433,8 +433,8 @@ bool e22_available()
 /*
  * Single-phase receive sized to the exact expected packet.
  *
- * Reads exactly (5 + expected_payload_len + 2) bytes — the full frame:
- *   [SYNC1][SYNC2][len][seq_lo][seq_hi][payload x len][crc_lo][crc_hi]
+ * Reads exactly (5 + expected_payload_len + 4) bytes — the full frame:
+ *   [SYNC1][SYNC2][len][seq_lo][seq_hi][payload x len][crc_lo][crc_hi][SYNC2][SYNC1]
  *
  * Timeout is calculated from the actual UART baud rate so it is tight
  * regardless of whether the baud is 9600 or 115200, with a 100 ms margin
@@ -449,7 +449,7 @@ bool e22_available()
  */
 int16_t recieve_e22_900t22s(uint8_t *buffer, uint16_t expected_payload_len)
 {
-    const uint16_t total    = 5u + expected_payload_len + 2u;   // hdr + payload + CRC
+    const uint16_t total    = 5u + expected_payload_len + 4u;   // hdr + payload + CRC
 
     int8_t s = uartRead(buffer, total);
 
