@@ -218,6 +218,18 @@ RCP_SimpleActuatorState RCP::simpleActuatorWrite_CLBK(uint8_t id, RCP_SimpleActu
     return RCP_SIMPLE_ACTUATOR_OFF;
 }
 
+float RCP::angledActuatorWrite_CLBK(uint8_t id, float controlVal) {
+    if (id == 0) {
+        HALOutboundData.servoOffset1 = controlVal;
+        return controlVal;
+    }
+    if (id == 1) {
+        HALOutboundData.servoOffset2 = controlVal;
+        return controlVal;
+    }
+    else return 0.0f;
+}
+
 // Callback for reading from sensor device. Automatic data streaming is handled inside the various singletons
 RCP::Floats4 RCP::readSensor(RCP_DeviceClass devclass, uint8_t id) {
     Floats4 floats;

@@ -107,6 +107,11 @@ private:
     // Used to suppress redundant transmissions when nothing has changed.
     GndStationData _lastSentData = {};
 
+    // Periodic downlink: transmit once every 5 successful receives so the FC
+    // always gets current GND data even when nothing has changed.
+    uint8_t _rxSuccessCount = 0;
+    bool    _periodicTxDue  = false;
+
     int8_t ReceiveData(telemetryData &gnd);
     int8_t TransmitData(GndStationData &data);
     static uint16_t Checksum(uint8_t *data, uint16_t length);

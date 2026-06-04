@@ -103,8 +103,18 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
 
         // GND primarily acts as a receiver; receive first so that HAL's ACK byte
         // is visible before the transmit decision is made this cycle.
+        // The channel is free immediately after a successful receive — that is the
+        // natural window used for the periodic GND→FC heartbeat transmit below.
         int8_t rx_result = ReceiveData(RX_Data);
         now = HAL_GetTick(); // refresh tick after the blocking receive
+
+        // Count successful receives; every 5th schedules a mandatory uplink.
+        if (rx_result == 0) {
+            if (++_rxSuccessCount >= 5) {
+                _rxSuccessCount = 0;
+                _periodicTxDue  = true;
+            }
+        }
 
         // --- ACK-based command management ---
         // An active command is retransmitted every cycle until HAL acknowledges
@@ -139,6 +149,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
         // Otherwise GND stays silent and lets FC transmit telemetry uninterrupted.
         const bool needsTransmit =
             _activeCmdPending                                               ||
+            _periodicTxDue                                                  ||
             (HALOutboundData.servoOffset1   != _lastSentData.servoOffset1)  ||
             (HALOutboundData.servoOffset2   != _lastSentData.servoOffset2)  ||
             (HALOutboundData.pyroActivation != _lastSentData.pyroActivation);
@@ -146,12 +157,13 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
         if (needsTransmit)
         {
             TransmitData(HALOutboundData);
-            _lastSentData = HALOutboundData;
+            _lastSentData  = HALOutboundData;
+            _periodicTxDue = false;
         }
 
         now = HAL_GetTick(); // refresh after the blocking transmit
         bzr_total++;
-        if (rx_result < -2) {
+        if (rx_result < -2 || rx_result == 0) {
             bzr_success++;
             RCPDebug("Incoming packet detected!"); // notify that a packet containing sync bytes have been detected
         }
@@ -204,12 +216,14 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             RCP::sendFourFloat(RCP_DEVCLASS_QUATERNION, 0,
                         {RX_Data.Qw, RX_Data.Qx, RX_Data.Qy, RX_Data.Qz});
 
-            RCP::sendTwoFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 0,
-                        {RX_Data.servoPos1, RX_Data.servoPos2});
+            RCP::sendOneFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 0, RX_Data.servoPos1);
+            RCP::sendOneFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 1, RX_Data.servoPos2);
 
             // RX_Data.RSSI is int8_t (raw E22 byte); cast to float for RCP streaming.
             // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet).
-            RCP::sendTwoFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, {RSSILocal, (float)RX_Data.RSSI});
+            // TODO check if the order is rights
+            RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, RSSILocal);
+            RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 1, RX_Data.RSSI);
 
             // pyros in order of trigger
             RCP::forceSendSimpleActuatorState(0);
