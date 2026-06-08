@@ -103,14 +103,21 @@ private:
     bool     _activeCmdPending   = false;
     uint32_t _activeCmdStartTick = 0;
 
-    // Snapshot of the last successfully transmitted outbound packet.
-    // Used to suppress redundant transmissions when nothing has changed.
+    // Snapshot of the last transmitted outbound packet; used to detect changes.
     GndStationData _lastSentData = {};
 
-    // Periodic downlink: transmit once every 5 successful receives so the FC
-    // always gets current GND data even when nothing has changed.
-    uint8_t _rxSuccessCount = 0;
-    bool    _periodicTxDue  = false;
+    // Burst-transmit timing constants.
+    static constexpr uint32_t BURST_DURATION_MS    = 1000u;   // transmit window length
+    static constexpr uint32_t PERIODIC_INTERVAL_MS = 10000u;  // heartbeat period
+    static constexpr uint32_t CMD_RETRY_COOLDOWN_MS = 2000u;  // gap between command bursts
+
+    // Burst state: when triggered, the frozen snapshot is retransmitted for
+    // BURST_DURATION_MS to maximise delivery in one concentrated window.
+    bool           _burstActive      = false;
+    uint32_t       _burstStartTick   = 0;
+    uint32_t       _lastBurstEndTick = 0;
+    uint32_t       _lastPeriodicTick = 0;
+    GndStationData _burstSnapshot    = {};
 
     int8_t ReceiveData(telemetryData &gnd);
     int8_t TransmitData(GndStationData &data);

@@ -266,9 +266,9 @@ RCP::Floats4 RCP::readSensor(RCP_DeviceClass devclass, uint8_t id) {
             break;
 
         case RCP_DEVCLASS_RPY:
-            floats.vals[0] = LocalGNDData.roll;
+            floats.vals[0] = LocalGNDData.yaw;
             floats.vals[1] = LocalGNDData.pitch;
-            floats.vals[2] = LocalGNDData.yaw;
+            floats.vals[2] = LocalGNDData.roll;
             break;
 
         case RCP_DEVCLASS_RADIO_STRENGTH:

@@ -103,18 +103,8 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
 
         // GND primarily acts as a receiver; receive first so that HAL's ACK byte
         // is visible before the transmit decision is made this cycle.
-        // The channel is free immediately after a successful receive — that is the
-        // natural window used for the periodic GND→FC heartbeat transmit below.
         int8_t rx_result = ReceiveData(RX_Data);
         now = HAL_GetTick(); // refresh tick after the blocking receive
-
-        // Count successful receives; every 5th schedules a mandatory uplink.
-        if (rx_result == 0) {
-            if (++_rxSuccessCount >= 5) {
-                _rxSuccessCount = 0;
-                _periodicTxDue  = true;
-            }
-        }
 
         // --- ACK-based command management ---
         // An active command is retransmitted every cycle until HAL acknowledges
@@ -143,25 +133,40 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
         // Drive CommandByte from the active command; idle when nothing is pending.
         HALOutboundData.CommandByte = _activeCmdPending ? _activeCmd : BYTE_NO_CMD;
 
-        // Transmit only when GND has something new to say:
-        //   • an active command waiting for ACK, OR
-        //   • a non-command data field has changed since the last successful TX.
-        // Otherwise GND stays silent and lets FC transmit telemetry uninterrupted.
-        const bool needsTransmit =
-            _activeCmdPending                                               ||
-            _periodicTxDue                                                  ||
-            (HALOutboundData.servoOffset1   != _lastSentData.servoOffset1)  ||
-            (HALOutboundData.servoOffset2   != _lastSentData.servoOffset2)  ||
-            (HALOutboundData.pyroActivation != _lastSentData.pyroActivation);
+        // Burst-transmit logic: GND stays silent unless a burst is active.
+        // A burst is started by a data change, the 10-second heartbeat, or an
+        // un-ACK'd command (with a 2-second cooldown between retries).
+        // Once started, the same frozen snapshot is sent every cycle for 1 second
+        // to maximise delivery without disrupting the FC any more than necessary.
+        if (!_burstActive) {
+            const bool dataChanged =
+                (HALOutboundData.servoOffset1   != _lastSentData.servoOffset1)  ||
+                (HALOutboundData.servoOffset2   != _lastSentData.servoOffset2)  ||
+                (HALOutboundData.pyroActivation != _lastSentData.pyroActivation);
 
-        if (needsTransmit)
-        {
-            TransmitData(HALOutboundData);
-            _lastSentData  = HALOutboundData;
-            _periodicTxDue = false;
+            const bool periodicDue = (now - _lastPeriodicTick >= PERIODIC_INTERVAL_MS);
+            const bool cmdRetryDue = _activeCmdPending &&
+                                     (now - _lastBurstEndTick >= CMD_RETRY_COOLDOWN_MS);
+
+            if (dataChanged || periodicDue || cmdRetryDue) {
+                _burstActive    = true;
+                _burstStartTick = now;
+                _burstSnapshot  = HALOutboundData;
+                _lastSentData   = HALOutboundData;
+                if (periodicDue) _lastPeriodicTick = now;
+            }
         }
 
-        now = HAL_GetTick(); // refresh after the blocking transmit
+        if (_burstActive) {
+            if (now - _burstStartTick < BURST_DURATION_MS) {
+                TransmitData(_burstSnapshot);
+            } else {
+                _burstActive      = false;
+                _lastBurstEndTick = now;
+            }
+        }
+
+        now = HAL_GetTick(); // refresh after any blocking transmit
         bzr_total++;
         if (rx_result < -2 || rx_result == 0) {
             bzr_success++;
