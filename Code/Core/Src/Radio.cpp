@@ -13,6 +13,7 @@
 #include "DataHandling.h"
 
 extern UART_HandleTypeDef huart1;
+float RSSILocal = 0.0F;
 
 Radio::Radio() {
     RXSize = sizeof(RXBuf);
@@ -195,8 +196,9 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         }
 
-        // post-processing
-        RSSILocal = getRSSIByte();
+        // RX_Data.RSSI is int8_t (raw E22 byte); cast to float for RCP streaming.
+        // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet), or -raw / 2 (TODO: reference datasheet)
+        RSSILocal = get_rssi_e22_900t22s();
         Update_Local_Data();
 
         // ---- 7. RCP data streaming ----
@@ -224,11 +226,8 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             RCP::sendOneFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 0, RX_Data.servoPos1);
             RCP::sendOneFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 1, RX_Data.servoPos2);
 
-            // RX_Data.RSSI is int8_t (raw E22 byte); cast to float for RCP streaming.
-            // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet), or -raw / 2 (TODO: reference datasheet)
-            int8_t RSSILocal = get_rssi_e22_900t22s();
-            RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, RSSILocal);
-            RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 1, RX_Data.RSSI);
+            RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, RX_Data.RSSI);
+            RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 1, RSSILocal);
 
             // pyros in order of trigger
             RCP::forceSendSimpleActuatorState(0);
@@ -345,6 +344,14 @@ int8_t Radio::decodeData(T &payload, uint16_t buf_len)
         return -6;  // trailing sync mismatch — frame boundary corrupted
 
     memcpy(&payload, &RXBuf[sync_idx + 5], sizeof(T));
+
+    // extract appended rssi byte from radio
+    // layout: [S1][S2][len][seq_lo][seq_hi][payload x N][CRC_lo][CRC_hi][S2][S1][RSSI]
+    //           0   1   2    3       4       5..4+N      5+N     6+N    7+N 8+N  9+N
+    const uint16_t rssi_idx = static_cast<uint16_t>(sync_idx) + 9u + payload_len;
+    RSSILocal = (rssi_idx < buf_len)
+                ? static_cast<float>(RXBuf[rssi_idx]) / -2.0F
+                : 0.0F;
 
     lastSeq = seq_rx;
     return 0;

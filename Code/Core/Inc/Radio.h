@@ -78,7 +78,6 @@ private:
     uint8_t TXBuf[240], RXBuf[240];
     int16_t lastSeq = 0;
     bool e_stopped = false;
-    float RSSILocal = 0.0F;
 
     // RX data is data received from HAL (IMU, GPS, data from sensors, etc)
     telemetryData RX_Data = {};

@@ -254,10 +254,8 @@ int8_t get_rssi_e22_900t22s(void)
         for (int i=0; i<2; i++) {
             if (RSSIReceive[i] == 0xC1 && RSSIReceive[i+1] == 0x00 && RSSIReceive[i+2] == 0x02)
             {
-                // byte 3 is the current RSSI which doesn't have purpose for the FC. We want
-                // the RSSI of the signal
                 last_rssi = RSSIReceive[4];
-                return static_cast<int8_t>((last_rssi) / -2);
+                return static_cast<int8_t>(last_rssi - 256);
             }
         }
 
