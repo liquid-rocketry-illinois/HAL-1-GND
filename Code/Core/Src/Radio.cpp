@@ -47,7 +47,7 @@ int8_t Radio::Init() {
 
     des_cfg.REG0 =   R0_765_E22_UART_BAUD::E22_UART_BAUD_38400
                    | R0_43_SERIAL_PORT_PARITY_BIT::MODE_8N1
-                   | R0_210_E22_AIR_DATA_RATE::E22_AIR_RATE_9_6K; // must match HAL (Telemetry.cpp)
+                   | R0_210_E22_AIR_DATA_RATE::E22_AIR_RATE_4_8K; // must match HAL (Telemetry.cpp)
 
     des_cfg.REG1 =   R1_76_SUB_PACKET_SETTING::BYTES_240
                    | R1_5_RSSI_ENVIRONMENTAL_NOISE_MEASURE_ENABLE
@@ -225,8 +225,8 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             RCP::sendOneFloat(RCP_DEVCLASS_ANGLED_ACTUATOR, 1, RX_Data.servoPos2);
 
             // RX_Data.RSSI is int8_t (raw E22 byte); cast to float for RCP streaming.
-            // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet).
-            // TODO check if the order is rights
+            // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet), or -raw / 2 (TODO: reference datasheet)
+            int8_t RSSILocal = get_rssi_e22_900t22s();
             RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 0, RSSILocal);
             RCP::sendOneFloat(RCP_DEVCLASS_RADIO_STRENGTH, 1, RX_Data.RSSI);
 

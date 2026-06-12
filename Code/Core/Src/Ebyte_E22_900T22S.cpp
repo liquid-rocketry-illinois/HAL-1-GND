@@ -13,7 +13,7 @@ static bool initialized = false;
 
 // Last RSSI byte appended by the E22 hardware to a received packet.
 // Updated inside recieve_e22_900t22s() when R3_7_RSSI_BYTE_ENABLE is set.
-// Raw value; actual dBm = -(256 - raw) / 2 per E22 datasheet.
+// Raw value; actual dBm = -raw / 2 per E22 datasheet.
 static uint8_t rssi_last_rx = 0;
 
 /* ================= AUX HANDLING ================= */
@@ -222,8 +222,17 @@ static int8_t uartRead(uint8_t *data, uint16_t len)
 
 /* ==================== GET RSSI ==================== */
 
-// Send command to e22 in transmission mode
+// Returns RSSI of the last received packet using the byte the E22 hardware appends
+// when R3_7_RSSI_BYTE_ENABLE is set. Formula: RSSI (dBm) = -raw/2 per E22 datasheet.
 float getRSSIByte()
+{
+    if (rssi_last_rx == 0) return 0.0F;
+    return static_cast<float>(rssi_last_rx) / -2.0F;
+}
+
+uint8_t last_rssi = 0;
+
+int8_t get_rssi_e22_900t22s(void)
 {
     // only callable in trans or WOR mode
     if ((HAL_GPIO_ReadPin(RADIO_M0_GPIO_Port, RADIO_M0_Pin) == GPIO_PIN_RESET &&
@@ -237,24 +246,26 @@ float getRSSIByte()
         // Flush any stale bytes (preamble zeros, prior echo leftovers) before read
         __HAL_UART_FLUSH_DRREGISTER(e22_cfg.huart);
 
-        waitAux_e22_900t22s(300);
+        waitAux_e22_900t22s(200);
         uartWrite(RSSISend, 6);
         uartRead(RSSIReceive, 5);
 
         // all bytes OK
-        if (RSSIReceive[0] == 0xC1 && RSSIReceive[1] == 0x00 && RSSIReceive[2] == 0x02)
-        {
-            // byte 3 is the current RSSI which doesn't have purpose for the FC. We want
-            // the RSSI of the signal
-            rssi_last_rx = RSSIReceive[4];
-            return static_cast<float>(rssi_last_rx) / -2.0F;
+        for (int i=0; i<2; i++) {
+            if (RSSIReceive[i] == 0xC1 && RSSIReceive[i+1] == 0x00 && RSSIReceive[i+2] == 0x02)
+            {
+                // byte 3 is the current RSSI which doesn't have purpose for the FC. We want
+                // the RSSI of the signal
+                last_rssi = RSSIReceive[4];
+                return static_cast<int8_t>((last_rssi) / -2);
+            }
         }
 
         return 0;
     }
 
     // Wrong mode
-    return -1.0F;
+    return -1;
 }
 
 /* ================= CONFIGURATION ================= */
@@ -449,14 +460,19 @@ bool e22_available()
  */
 int16_t recieve_e22_900t22s(uint8_t *buffer, uint16_t expected_payload_len)
 {
-    const uint16_t total    = 5u + expected_payload_len + 4u;   // hdr + payload + CRC
+    const uint16_t pkt_total = 5u + expected_payload_len + 4u;  // hdr + payload + CRC
+    const uint16_t total     = pkt_total + 1u;                  // +1 for hardware RSSI byte (R3_7_RSSI_BYTE_ENABLE)
 
     int8_t s = uartRead(buffer, total);
 
-    if (s == E22_OK)
+    if (s == E22_OK) {
+        rssi_last_rx = buffer[pkt_total];
         return (int16_t)total;
+    }
 
     uint16_t received = total - e22_cfg.huart->RxXferCount;
+    if (received >= pkt_total + 1u)
+        rssi_last_rx = buffer[pkt_total];
     if (received < 7u)
         return -2;   // not enough bytes for any valid packet
     return (int16_t)received;
