@@ -9,6 +9,8 @@
 #include "Ebyte_E22_900T22S_defs.h"
 #include "RADIO_DEFNS.h"
 
+#define GLOBAL_RADIO_CHAN CH909
+
 // ======================= DATA ==========================
 
 typedef enum {
@@ -120,6 +122,7 @@ private:
 
     int8_t ReceiveData(telemetryData &gnd);
     int8_t TransmitData(GndStationData &data);
+    int8_t WirelessConfig(config_e22_900t22s *cfg);
     static uint16_t Checksum(uint8_t *data, uint16_t length);
     template<typename T>
     int8_t decodeData(T &payload, uint16_t buf_len);

@@ -55,9 +55,9 @@ int8_t Radio::Init() {
                    | R1_2_SOFTWARE_MODE_SWITCHING_OFF
                    | R1_10_E22_TX_POWER::E22_TX_POWER_22DBM;
 
-    des_cfg.REG2 = CH915;
+    des_cfg.REG2 = GLOBAL_RADIO_CHAN;
 
-    des_cfg.REG3 =   R3_7_RSSI_BYTE_ENABLE
+    des_cfg.REG3 =   R3_7_RSSI_BYTE_DISABLE
                    | R3_6_TRANSFER_METHOD_FIXED_POINT
                    | R3_5_REPEATER_OFF
                    | R3_4_LBT_DISABLED
@@ -198,7 +198,11 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
 
         // RX_Data.RSSI is int8_t (raw E22 byte); cast to float for RCP streaming.
         // Actual dBm value = -(256 - raw) / 2  (per E22 datasheet), or -raw / 2 (TODO: reference datasheet)
-        RSSILocal = get_rssi_e22_900t22s();
+        static uint32_t lastRssiTick = 0;
+        if (now - lastRssiTick >= 2000u) {
+            RSSILocal = get_rssi_e22_900t22s();
+            lastRssiTick = now;
+        }
         Update_Local_Data();
 
         // ---- 7. RCP data streaming ----
@@ -289,6 +293,29 @@ int8_t Radio::TransmitData(GndStationData &dat) {
     return 0;
 }
 
+int8_t Radio::WirelessConfig(config_e22_900t22s *cfg_d) {
+    uint8_t frame[12];
+
+    frame[0] = 0xCF;
+    frame[1] = 0xCF;
+    frame[2] = COMMAND_BYTE_WRITE_CFG_SAVE_FLASH;
+    frame[3] = 0x00;
+    frame[4] = 0x07;
+    frame[5] = cfg_d->ADDH;
+    frame[6] = cfg_d->ADDL;
+    frame[7] = cfg_d->NETID;
+    frame[8] = cfg_d->REG0;
+    frame[9] = cfg_d->REG1;
+    frame[10] = cfg_d->REG2;
+    frame[11] = cfg_d->REG3;
+
+    if (encodeAndSend(frame) != 0) {
+        RCPDebug("Wireless Config Send Failed");
+        return -1;
+    }
+    return 0;
+}
+
 // Decode a received frame from RXBuf.
 // buf_len is the number of bytes actually received (from recieve_e22_900t22s),
 // so the sync search is bounded to valid data and cannot match stale buffer bytes.
@@ -344,15 +371,6 @@ int8_t Radio::decodeData(T &payload, uint16_t buf_len)
         return -6;  // trailing sync mismatch — frame boundary corrupted
 
     memcpy(&payload, &RXBuf[sync_idx + 5], sizeof(T));
-
-    // extract appended rssi byte from radio
-    // layout: [S1][S2][len][seq_lo][seq_hi][payload x N][CRC_lo][CRC_hi][S2][S1][RSSI]
-    //           0   1   2    3       4       5..4+N      5+N     6+N    7+N 8+N  9+N
-    const uint16_t rssi_idx = static_cast<uint16_t>(sync_idx) + 9u + payload_len;
-    RSSILocal = (rssi_idx < buf_len)
-                ? static_cast<float>(RXBuf[rssi_idx]) / -2.0F
-                : 0.0F;
-
     lastSeq = seq_rx;
     return 0;
 }
@@ -367,7 +385,7 @@ uint8_t Radio::encodeAndSend(const T &payload)
     // fixed mode header — module strips these before delivering to receiver
     TXBuf[0] = HAL1_RADIO_ADDRHIGH;
     TXBuf[1] = HAL1_RADIO_ADDRLOW;
-    TXBuf[2] = CH915;
+    TXBuf[2] = GLOBAL_RADIO_CHAN;
 
     // What is actually transmitted
     TXBuf[3] = TELEMETRY_SYNC1;

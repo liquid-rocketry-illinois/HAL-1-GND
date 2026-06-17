@@ -212,7 +212,7 @@ static int8_t uartRead(uint8_t *data, uint16_t len)
         &huart1, // e22_cfg.huart,
         data,
         len,
-        500);
+        300);
 
     while (!auxHigh()) {} // wait for read to finish in case
     if(status != HAL_OK) return E22_ERR_UART;
