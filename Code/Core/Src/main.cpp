@@ -15,12 +15,20 @@
 #include "RADIO_DEFNS.h"
 #include "RCP_Target.h"
 #include "tusb.h"
+#include <cstdio>
 
 extern void* EStop;
 
 tusb_rhport_init_t TUSB_INIT_DATA = {.role = TUSB_ROLE_DEVICE, .speed = TUSB_SPEED_FULL};
 
 Radio mainDev;
+
+float CH_Global = CH909; // default
+
+void PromptAccept(const RCP::PromptData &in) {
+    CH_Global = in.floatData;
+    RCP::setPrompt("Input Frequency: ", RCP_PromptDataType_Float, PromptAccept);
+}
 
 extern "C" void Init() {
 
@@ -70,7 +78,9 @@ extern "C" void Init() {
         HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         HAL_Delay(100);
     }
+    RCP::resetPrompt();
 
+    RCP::setPrompt("Input Frequency: ", RCP_PromptDataType_Float, PromptAccept);
 }
 
 
@@ -151,38 +161,18 @@ RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
             ;
     }
     switch (LocalGNDData.CommandResponseByte) {
-        // 0: HAL default / no command active
-        case 0:
-            RCPDebug("No connection or invalid command!");
-            break;
         // Sensor and status issue codes (HAL-defined, counting up from 1)
-        case 1:
-            RCPDebug("Servo tolerance Issue!");
+        case 0:
             break;
-        case 2:
-            RCPDebug("Vertical Axis Deviation!");
+        case 217:
+            RCPDebug("ABORTED!");
             break;
-        // Controls / CONOPs event codes (HAL-defined, counting down from 255)
-        case 255:
-            RCPDebug("Main Drogue Triggered");
+        default: {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "HAL response: %u\n", LocalGNDData.CommandResponseByte);
+            RCP::RCPWriteSerialString(buf);
             break;
-        case 254:
-            RCPDebug("Backup Drogue Triggered");
-            break;
-        case 253:
-            RCPDebug("Main Chute Triggered");
-            break;
-        case 252:
-            RCPDebug("Burnout. Starting Roll-CTRL");
-            break;
-        case 251:
-            RCPDebug("Roll CTRL Deactivated!");
-            break;
-        case 250:
-            RCPDebug("WARNING Horizontal drift notable!");
-            break;
-        default:
-            break;
+        }
     }
 
     return RCP_SIMPLE_ACTUATOR_OFF;

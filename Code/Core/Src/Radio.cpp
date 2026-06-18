@@ -13,6 +13,7 @@
 #include "DataHandling.h"
 
 extern UART_HandleTypeDef huart1;
+extern float CH_Global;
 float RSSILocal = 0.0F;
 
 Radio::Radio() {
@@ -118,10 +119,10 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
         // ANNOUNCING/VERIFYING states also block re-entry.
         if (_hasLinked &&
             _channelState == ChannelState::STABLE &&
-            _targetChannel != static_cast<R2_E22Channel915>(GLOBAL_RADIO_CHAN) &&
+            _targetChannel != static_cast<R2_E22Channel915>(CH_Global) &&
             now - _lastRxTick >= LINK_LOST_TIMEOUT_MS) {
             RCPDebug("Link lost on non-default channel — reverting to default.");
-            setChannel(static_cast<R2_E22Channel915>(GLOBAL_RADIO_CHAN));
+            setChannel(static_cast<R2_E22Channel915>(static_cast<int>(CH_Global)));
         }
 
         // Channel-change state machine.
