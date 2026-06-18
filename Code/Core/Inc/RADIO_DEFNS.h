@@ -26,27 +26,10 @@
 #define E22_RECEIVE_ERR         3
 #define E22_BAD_LENGTH          4
 
-// ===== CMD BYTES: GND → HAL =====
-// Values must match HAL-side definitions in Telemetry.h / constants.h.
-// Value 0 means "no command" (default/idle — HAL ignores it).
-
-#define BYTE_NO_CMD          0      // No command / idle
-#define BYTE_HANDSHAKE       0xA1u  // Ping: HAL responds with BYTE_HANDSHAKE_ACK
-#define BYTE_REQUEST_DATA    0xC3u  // Request a telemetry packet from HAL
-#define BYTE_DEFLECT_TEST    150    // Command HAL to run a fin/servo deflection test
-                                    //   (HAL: DEFLECT_TEST = 150 in Telemetry.h)
-#define BYTE_SERVO_TARE      0xD4u  // Tell HAL to apply servoOffset1/2 as new zero pts
-                                    //   (HAL: SERVO_OFFSET_CMD_BYTE = 0xD4)
+// ===== SPECIAL CHANNEL BYTE VALUES =====
+// channelByte normally carries the R2_E22Channel915 channel value (52–78).
+// BYTE_ABORT is out of that range so HAL can distinguish an e-stop from a channel.
 #define BYTE_ABORT           217    // E-Stop: HAL halts all active operations immediately
                                     //   (HAL: SHUTDOWN_KEEPALIVE = 217)
-
-// ===== CMD RESPONSE BYTES: HAL → GND (CommandResponseByte) =====
-#define BYTE_HANDSHAKE_ACK   0xB2u  // HAL acknowledges BYTE_HANDSHAKE
-                                    //   (HAL: HANDSHAKE_FC_BYTE = 0xB2)
-
-// Commands are now ACK-based: GND retransmits each command every Update() cycle
-// until HAL echoes it back in CommandResponseByte, or a 5-second timeout fires.
-// CMD_TRANSMIT_REPEAT is no longer used.
-#define CMD_ACK_TIMEOUT_MS  5000u
 
 #endif //CODE_RADIO_DEFNS_H

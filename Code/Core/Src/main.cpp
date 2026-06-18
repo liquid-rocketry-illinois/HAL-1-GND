@@ -70,7 +70,7 @@ extern "C" void Init() {
         HAL_GPIO_WritePin(BZR_GPIO_Port, BZR_Pin, GPIO_PIN_RESET);
         HAL_Delay(100);
     }
-    // breakpoint point
+
 }
 
 
@@ -151,10 +151,6 @@ RCP_SimpleActuatorState RCP::readSimpleActuator(uint8_t id) {
             ;
     }
     switch (LocalGNDData.CommandResponseByte) {
-        // BYTE_HANDSHAKE_ACK (0xB2 = 178): HAL acknowledged our BYTE_HANDSHAKE ping.
-        case BYTE_HANDSHAKE_ACK:
-            RCPDebug("HAL acknowledged handshake/ping.");
-            break;
         // 0: HAL default / no command active
         case 0:
             RCPDebug("No connection or invalid command!");
@@ -204,10 +200,7 @@ RCP_SimpleActuatorState RCP::simpleActuatorWrite_CLBK(uint8_t id, RCP_SimpleActu
             if (state == RCP_SIMPLE_ACTUATOR_ON) HALOutboundData.pyroActivation = PYROMAIN;
             break;
 
-        // Case 3: fin/servo deflection test — enqueue command rather than writing
-        // directly to CommandByte so the queue can guarantee repeated delivery.
         case 3:
-            if (state == RCP_SIMPLE_ACTUATOR_ON) mainDev.enqueueCommand(BYTE_DEFLECT_TEST);
             break;
 
         default:
@@ -295,9 +288,6 @@ void RCP::writeSensorTare(RCP_DeviceClass devclass, uint8_t id, [[maybe_unused]]
         case RCP_DEVCLASS_ANGLED_ACTUATOR:
             if (id == 0) HALOutboundData.servoOffset1 = tareVal;
             if (id == 1) HALOutboundData.servoOffset2 = tareVal;
-            // Enqueue so HAL is guaranteed to receive the tare command
-            // alongside the new offset values in the payload.
-            mainDev.enqueueCommand(BYTE_SERVO_TARE);
             break;
 
             // NOTE: accelerometer and gyroscope are not zeroed. we need what the sensor detects

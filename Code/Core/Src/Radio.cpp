@@ -107,49 +107,77 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
         int8_t rx_result = ReceiveData(RX_Data);
         now = HAL_GetTick(); // refresh tick after the blocking receive
 
-        // --- ACK-based command management ---
-        // An active command is retransmitted every cycle until HAL acknowledges
-        // it (CommandResponseByte == sent command) or 5 s elapse (timeout).
-        if (_activeCmdPending) {
-            const bool acked   = (rx_result == 0 &&
-                                  RX_Data.CommandResponseByte == _activeCmd);
-            const bool timeout = (now - _activeCmdStartTick >= 5000u);
-            if (acked || timeout) {
-                if (acked)   RCPDebug("Cmd ACK received");
-                if (timeout) RCPDebug("Cmd TX timed out (5 s)");
-                _activeCmdPending = false;
-                _activeCmd        = BYTE_NO_CMD;
-            }
+        if (rx_result == 0) {
+            _lastRxTick = now;
+            _hasLinked  = true;
         }
 
-        // Dequeue next command if the slot is now free
-        if (!_activeCmdPending && _cmdQCount > 0) {
-            _activeCmd           = _cmdQueue[_cmdQHead];
-            _cmdQHead            = (_cmdQHead + 1) % CMD_QUEUE_DEPTH;
-            _cmdQCount--;
-            _activeCmdPending    = true;
-            _activeCmdStartTick  = now;
+        // Lost-link recovery: if link was established, then lost for LINK_LOST_TIMEOUT_MS
+        // while on a non-default channel, revert to GLOBAL_RADIO_CHAN so both sides
+        // can find each other again. Self-gated: once on default, condition is false;
+        // ANNOUNCING/VERIFYING states also block re-entry.
+        if (_hasLinked &&
+            _channelState == ChannelState::STABLE &&
+            _targetChannel != static_cast<R2_E22Channel915>(GLOBAL_RADIO_CHAN) &&
+            now - _lastRxTick >= LINK_LOST_TIMEOUT_MS) {
+            RCPDebug("Link lost on non-default channel — reverting to default.");
+            setChannel(static_cast<R2_E22Channel915>(GLOBAL_RADIO_CHAN));
         }
 
-        // Drive CommandByte from the active command; idle when nothing is pending.
-        HALOutboundData.CommandByte = _activeCmdPending ? _activeCmd : BYTE_NO_CMD;
+        // Channel-change state machine.
+        // ANNOUNCING: broadcast pending channel on the OLD channel; switch GND radio
+        //             only after the burst completes so HAL gets the announcement first.
+        // VERIFYING:  GND switched; wait for HAL telemetry on new channel to confirm.
+        //             Revert to old channel if nothing heard within the timeout.
+        switch (_channelState) {
+            case ChannelState::STABLE:
+                break;
+            case ChannelState::ANNOUNCING:
+                if (!_burstActive) {
+                    // Burst has finished — HAL has had 1 s of repeated announcements.
+                    // Now switch GND's own radio and start verifying.
+                    changeOpFreq_e22_900t22s(_pendingChannel);
+                    _targetChannel    = _pendingChannel;
+                    _channelState     = ChannelState::VERIFYING;
+                    _channelStateTick = now;
+                }
+                break;
+            case ChannelState::VERIFYING:
+                if (rx_result == 0) {
+                    // HAL responded on the new channel — both sides are in sync.
+                    _channelState = ChannelState::STABLE;
+                    RCPDebug("Channel change verified.");
+                } else if (now - _channelStateTick >= CHANNEL_VERIFY_TIMEOUT_MS) {
+                    // HAL went silent — it likely didn't receive the announcement.
+                    // Revert GND back to the previous channel.
+                    changeOpFreq_e22_900t22s(_prevChannel);
+                    _targetChannel = _prevChannel;
+                    _channelState  = ChannelState::STABLE;
+                    RCPDebug("Channel change failed: no HAL response, reverted.");
+                }
+                break;
+        }
+
+        // During ANNOUNCING use the pending channel value so HAL knows where to go;
+        // otherwise send the active channel (confirms to HAL what channel GND is on).
+        HALOutboundData.channelByte = static_cast<uint8_t>(
+            _channelState == ChannelState::ANNOUNCING ? _pendingChannel : _targetChannel
+        );
 
         // Burst-transmit logic: GND stays silent unless a burst is active.
-        // A burst is started by a data change, the 10-second heartbeat, or an
-        // un-ACK'd command (with a 2-second cooldown between retries).
+        // A burst is started by a data change or the 10-second heartbeat.
         // Once started, the same frozen snapshot is sent every cycle for 1 second
         // to maximise delivery without disrupting the FC any more than necessary.
         if (!_burstActive) {
             const bool dataChanged =
                 (HALOutboundData.servoOffset1   != _lastSentData.servoOffset1)  ||
                 (HALOutboundData.servoOffset2   != _lastSentData.servoOffset2)  ||
-                (HALOutboundData.pyroActivation != _lastSentData.pyroActivation);
+                (HALOutboundData.pyroActivation != _lastSentData.pyroActivation) ||
+                (HALOutboundData.channelByte    != _lastSentData.channelByte);
 
             const bool periodicDue = (now - _lastPeriodicTick >= PERIODIC_INTERVAL_MS);
-            const bool cmdRetryDue = _activeCmdPending &&
-                                     (now - _lastBurstEndTick >= CMD_RETRY_COOLDOWN_MS);
 
-            if (dataChanged || periodicDue || cmdRetryDue) {
+            if (dataChanged || periodicDue) {
                 _burstActive    = true;
                 _burstStartTick = now;
                 _burstSnapshot  = HALOutboundData;
@@ -162,8 +190,7 @@ int8_t Radio::Update(telemetryData* GNDLocalData) {
             if (now - _burstStartTick < BURST_DURATION_MS) {
                 TransmitData(_burstSnapshot);
             } else {
-                _burstActive      = false;
-                _lastBurstEndTick = now;
+                _burstActive = false;
             }
         }
 
@@ -252,16 +279,12 @@ void Radio::EStop() {
     e_stopped = true;
 }
 
-bool Radio::enqueueCommand(uint8_t cmd) {
-    if (_cmdQCount >= CMD_QUEUE_DEPTH)
-    {
-        RCPDebug("Command failed, queue full!");
-        return false;
-    }// queue full — caller should handle
-    _cmdQueue[_cmdQTail] = cmd;
-    _cmdQTail = (_cmdQTail + 1) % CMD_QUEUE_DEPTH;
-    _cmdQCount++;
-    return true;
+void Radio::setChannel(R2_E22Channel915 ch) {
+    if (ch == _targetChannel && _channelState == ChannelState::STABLE) return;
+    _prevChannel    = _targetChannel;
+    _pendingChannel = ch;
+    _channelState   = ChannelState::ANNOUNCING;
+    // GND radio stays on _prevChannel until the announcement burst completes.
 }
 
 
@@ -282,11 +305,9 @@ int8_t Radio::ReceiveData(telemetryData &dat) {
 
 int8_t Radio::TransmitData(GndStationData &dat) {
     if(e_stopped) {
-        // Override CommandByte with BYTE_ABORT unconditionally.
-        // The queue is bypassed once EStop() fires; BYTE_ABORT will be sent
-        // on every subsequent Update() cycle for as long as the MCU runs,
-        // which gives HAL the best chance of receiving it despite packet loss.
-        dat.CommandByte = BYTE_ABORT;
+        // Override channelByte with BYTE_ABORT unconditionally (217 is outside
+        // valid channel range 52–78, so HAL can distinguish it).
+        dat.channelByte = BYTE_ABORT;
         RCPDebug("Transmitting Abort Signal");
     }
     encodeAndSend(dat);
@@ -385,7 +406,7 @@ uint8_t Radio::encodeAndSend(const T &payload)
     // fixed mode header — module strips these before delivering to receiver
     TXBuf[0] = HAL1_RADIO_ADDRHIGH;
     TXBuf[1] = HAL1_RADIO_ADDRLOW;
-    TXBuf[2] = GLOBAL_RADIO_CHAN;
+    TXBuf[2] = static_cast<uint8_t>(_targetChannel);
 
     // What is actually transmitted
     TXBuf[3] = TELEMETRY_SYNC1;

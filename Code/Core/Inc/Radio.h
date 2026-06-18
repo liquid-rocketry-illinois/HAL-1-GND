@@ -24,7 +24,7 @@ typedef struct
     float    servoOffset1      = 0.0f;  // S1 zero-point offset (degrees)
     float    servoOffset2      = 0.0f;  // S2 zero-point offset (degrees)
     uint32_t pyroActivation    = 0;
-    uint8_t  CommandByte; // Byte sent to HAL
+    uint8_t  channelByte       = GLOBAL_RADIO_CHAN;  // Operating channel (R2_E22Channel915 cast to uint8_t)
 } GndStationData;
 
 // ordering to reduce padding total size
@@ -60,26 +60,30 @@ public:
     telemetryData GetRXData();
     float getRSSI();
 
-    /**
-     * @brief Enqueue a command byte to be sent to HAL.
-     *
-     * Each enqueued command is transmitted CMD_TRANSMIT_REPEAT times in
-     * consecutive packets to improve delivery reliability on the lossy RF
-     * link. Commands are sent in FIFO order. Only one command is active at
-     * a time; its byte occupies GndStationData::CommandByte while repeating,
-     * then the next command is popped.
-     *
-     * @param cmd  One of the BYTE_* constants defined in RADIO_DEFNS.h.
-     *             Do NOT enqueue BYTE_ABORT — call EStop() instead.
-     * @return true if the command was added, false if the queue is full.
-     */
-    bool enqueueCommand(uint8_t cmd);
+    // Initiate a channel change. GND first announces the new channel on the current
+    // channel, then switches its own radio, then verifies HAL responds on the new
+    // channel. Reverts if HAL goes silent.
+    void setChannel(R2_E22Channel915 ch);
 
 private:
     config_e22_900t22s cfg;
     uint8_t TXBuf[240], RXBuf[240];
     int16_t lastSeq = 0;
     bool e_stopped = false;
+
+    enum class ChannelState { STABLE, ANNOUNCING, VERIFYING };
+
+    R2_E22Channel915 _targetChannel  = GLOBAL_RADIO_CHAN;  // channel GND radio is currently on
+    R2_E22Channel915 _pendingChannel = GLOBAL_RADIO_CHAN;  // channel being switched to
+    R2_E22Channel915 _prevChannel    = GLOBAL_RADIO_CHAN;  // for revert on verify timeout
+    ChannelState     _channelState   = ChannelState::STABLE;
+    uint32_t         _channelStateTick = 0;
+
+    bool     _hasLinked  = false;  // true after first successful RX from HAL
+    uint32_t _lastRxTick = 0;     // timestamp of last successful RX
+
+    static constexpr uint32_t CHANNEL_VERIFY_TIMEOUT_MS = 5000u;
+    static constexpr uint32_t LINK_LOST_TIMEOUT_MS      = 5000u;
 
     // RX data is data received from HAL (IMU, GPS, data from sensors, etc)
     telemetryData RX_Data = {};
@@ -88,35 +92,17 @@ private:
 
     uint16_t RXSize, TXSize;
 
-    // ---- Command queue ----
-    // Commands are enqueued via enqueueCommand() and consumed here so that
-    // every command is guaranteed to be sent CMD_TRANSMIT_REPEAT times before
-    // the next one is started, surviving occasional packet loss.
-    static const uint8_t CMD_QUEUE_DEPTH = 8;
-    uint8_t _cmdQueue[CMD_QUEUE_DEPTH] = {};
-    uint8_t _cmdQHead  = 0;
-    uint8_t _cmdQTail  = 0;
-    uint8_t _cmdQCount = 0;
-    // ACK-based command state.
-    // A command is dequeued once, sent every Update() cycle, and held until
-    // HAL echoes it back in CommandResponseByte (ACK) or 5 s elapse (timeout).
-    uint8_t  _activeCmd          = BYTE_NO_CMD;
-    bool     _activeCmdPending   = false;
-    uint32_t _activeCmdStartTick = 0;
-
     // Snapshot of the last transmitted outbound packet; used to detect changes.
     GndStationData _lastSentData = {};
 
     // Burst-transmit timing constants.
     static constexpr uint32_t BURST_DURATION_MS    = 1000u;   // transmit window length
     static constexpr uint32_t PERIODIC_INTERVAL_MS = 10000u;  // heartbeat period
-    static constexpr uint32_t CMD_RETRY_COOLDOWN_MS = 2000u;  // gap between command bursts
 
     // Burst state: when triggered, the frozen snapshot is retransmitted for
     // BURST_DURATION_MS to maximise delivery in one concentrated window.
     bool           _burstActive      = false;
     uint32_t       _burstStartTick   = 0;
-    uint32_t       _lastBurstEndTick = 0;
     uint32_t       _lastPeriodicTick = 0;
     GndStationData _burstSnapshot    = {};
 
